@@ -11,6 +11,7 @@ const validateLoginInput = require('../validation/login');
 var utils = require('../utils/index');
 
 const User = require('../model/User');
+var ObjectId = require('mongoose').Types.ObjectId;
 
 router.get('/', function(req, res) {
     User.find({}, (err, users) => {
@@ -110,6 +111,14 @@ router.get('/me', passport.authenticate('jwt', { session: false }), (req, res) =
         id: req.user.id,
         username: req.user.username,
         email: req.user.email
+    });
+});
+
+router.get('/:id', (req, res) => {
+    let id = req.params.id;
+    User.findOne({ "_id": new ObjectId(id)}, (err, user) => {
+        if(err) next(err);
+        res.json(user);
     });
 });
 

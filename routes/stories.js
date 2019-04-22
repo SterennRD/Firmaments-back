@@ -43,6 +43,15 @@ router.get('/:id', async function (req, res) {
     });
 });
 
+// Get last stories
+router.get('/last/posted', async function (req, res) {
+    Story.find({}).sort('-created_at').limit(10).exec(function(err, stories){
+        if (err)
+            next(err)
+        res.json(stories);
+    });
+});
+
 // Post a story
 router.post('/', VerifyToken, function(req, res, next) {
     console.log(req.body);
