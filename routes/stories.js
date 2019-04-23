@@ -80,7 +80,7 @@ router.get('/last/posted', async function (req, res) {
             '$lookup': {
                 'from': 'users',
                 'localField': '_id',
-                'foreignField': 'reading_lists',
+                'foreignField': 'reading_lists.stories',
                 'as': 'faved'
             }
         }, {
