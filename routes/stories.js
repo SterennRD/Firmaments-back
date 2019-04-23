@@ -73,6 +73,13 @@ router.get('/last/posted', async function (req, res) {
     });*/
     Story.aggregate([
         {
+            '$lookup': {
+                'from': 'users',
+                'localField': 'author',
+                'foreignField': '_id',
+                'as': 'author'
+            }
+        }, {
             '$unwind': {
                 'path': '$chapters'
             }
@@ -93,6 +100,17 @@ router.get('/last/posted', async function (req, res) {
                 }
             }
         }, {
+            '$unwind': {
+                'path': '$author',
+                'preserveNullAndEmptyArrays': true
+            }
+        }, {
+            '$project': {
+                'faved': 0,
+                'author.reading_lists': 0,
+                'author.badges': 0
+            }
+        }, {
             '$group': {
                 '_id': '$_id',
                 'doc': {
@@ -106,10 +124,6 @@ router.get('/last/posted', async function (req, res) {
         }, {
             '$sort': {
                 'created_at': 1
-            }
-        }, {
-            '$project': {
-                'faved': 0
             }
         }
     ]).exec(function(err, stories){
