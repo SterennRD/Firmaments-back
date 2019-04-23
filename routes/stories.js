@@ -10,11 +10,13 @@ var VerifyToken = require('../auth/VerifyToken');
 
 // Get all stories
 router.get('/', function(req, res) {
-    const data = [
-        { title: "Alma", description: "En face du centre commercial Alma" },
-        { title: "Beaulieu", description: "Dans l'université Rennes 1" }
-    ];
-    res.json(data);
+    Story.find({}).sort('-created_at').populate('author').exec(function(err, stories){
+        if (err)
+            next(err)
+        else {
+            res.json(stories);
+        }
+    });
 });
 
 // Get story from user
@@ -45,10 +47,66 @@ router.get('/:id', async function (req, res) {
 
 // Get last stories
 router.get('/last/posted', async function (req, res) {
-    Story.find({}).sort('-created_at').limit(10).exec(function(err, stories){
+    /*Story.find(
+        {
+            '$lookup': {
+                'from': 'users',
+                'localField': '_id',
+                'foreignField': 'reading_lists',
+                'as': 'faved'
+            }
+        }, {
+            '$addFields': {
+                'nb_favorites': {
+                    '$size': '$faved'
+                }
+            }
+        }
+    ).sort('-created_at').populate('author').limit(10).exec(function(err, stories){
         if (err)
-            next(err)
-        res.json(stories);
+            return err
+        else {
+
+            console.log(stories[1].author.username);
+            res.json(stories);
+        }
+    });*/
+    Story.aggregate([
+        {
+            '$unwind': {
+                'path': '$chapters'
+            }
+        }, {
+            '$lookup': {
+                'from': 'users',
+                'localField': '_id',
+                'foreignField': 'reading_lists',
+                'as': 'faved'
+            }
+        }, {
+            '$addFields': {
+                'nb_favorites': {
+                    '$size': '$faved'
+                },
+                'nb_comments': {
+                    '$size': '$chapters.comments'
+                }
+            }
+        }, {
+            '$project': {
+                'faved': 0
+            }
+        }, {
+            '$sort': {
+                'created_at': 1
+            }
+        }
+    ]).limit(10).exec(function(err, stories){
+        if (err)
+            return err
+        else {
+            res.json(stories);
+        }
     });
 });
 
