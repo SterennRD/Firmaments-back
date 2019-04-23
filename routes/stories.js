@@ -93,15 +93,26 @@ router.get('/last/posted', async function (req, res) {
                 }
             }
         }, {
-            '$project': {
-                'faved': 0
+            '$group': {
+                '_id': '$_id',
+                'doc': {
+                    '$first': '$$ROOT'
+                }
+            }
+        }, {
+            '$replaceRoot': {
+                'newRoot': '$doc'
             }
         }, {
             '$sort': {
                 'created_at': 1
             }
+        }, {
+            '$project': {
+                'faved': 0
+            }
         }
-    ]).limit(10).exec(function(err, stories){
+    ]).exec(function(err, stories){
         if (err)
             return err
         else {
