@@ -19,6 +19,92 @@ router.get('/', function(req, res) {
     });
 });
 
+// Get all stories
+router.get('/all/:page/:perpage', function(req, res) {
+    console.log('page number : ' + req.params.page);
+    console.log('per page : ' + req.params.perpage);
+
+    let pageNumber = req.params.page ; // parseInt(req.query.pageNo)
+    let size = req.params.perpage;
+    let query = {}
+
+    if (pageNumber < 0 || pageNumber == 0 || isNaN(pageNumber)) {
+        response = { "error": true, "message": "Numéro de page invalide" };
+        res.json(response)
+    } else {
+
+        query.skip = size * (pageNumber - 1)
+        query.limit = parseInt(size)
+        // Find some documents
+        Story.aggregate([
+            {
+                '$lookup': {
+                    'from': 'users',
+                    'localField': 'author',
+                    'foreignField': '_id',
+                    'as': 'author'
+                }
+            }, {
+                '$unwind': {
+                    'path': '$author'
+                }
+            }, {
+                '$lookup': {
+                    'from': 'users',
+                    'localField': '_id',
+                    'foreignField': 'reading_lists.stories',
+                    'as': 'faved'
+                }
+            }, {
+                '$project': {
+                    'title': 1,
+                    'author.username': 1,
+                    'author.username_display': 1,
+                    'author._id': 1,
+                    'description': 1,
+                    'updated_at': 1,
+                    'category': 1,
+                    'rating': 1,
+                    'status': 1,
+                    'chapters': 1,
+                    'nb_comments': {
+                        '$sum': {
+                            '$map': {
+                                'input': '$chapters',
+                                'as': 'c',
+                                'in': {
+                                    '$size': '$$c.comments'
+                                }
+                            }
+                        }
+                    },
+                    'nb_favorites': {
+                        '$size': '$faved'
+                    },
+                    'nb_likes': {
+                        '$size': '$likes'
+                    }
+                }
+            }, {
+                '$skip': query.skip
+            }, {
+                '$limit': query.limit
+            }, {
+                '$sort': {
+                    'created_at': 1
+                }
+            }
+        ]).exec(function (err, data) {
+            // Mongo command to fetch all data from collection.
+            if (err) {
+                response = { "error": true, "message": "Error fetching data" };
+            } else {
+                res.json(data);
+            }
+        });
+    }
+});
+
 // Get story from user
 router.get('/user/:id', async function (req, res) {
     var id = req.params.id;
