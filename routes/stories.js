@@ -19,6 +19,19 @@ router.get('/', function(req, res) {
     });
 });
 
+router.get('/all/:page', (req, res) => {
+    let pageNo = req.params.page ;
+    Story.paginate(pageNo, function (err, response) {
+
+        if (err) {
+            return res.status(500).json({
+                message: "Error",
+                error: err
+            });
+        }
+        return res.status(200).json(response);
+    });
+});
 // Get all stories
 router.get('/all/:page/:perpage', function(req, res) {
     console.log('page number : ' + req.params.page);
