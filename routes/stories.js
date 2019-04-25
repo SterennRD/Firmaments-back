@@ -102,11 +102,11 @@ router.get('/:id', async function (req, res) {
                 }
             }
         }
-    ]).exec(function(err, stories){
+    ]).exec(function(err, story){
         if (err)
             return err
         else {
-            res.json(stories);
+            res.json(story[0]);
         }
     });
 
