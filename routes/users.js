@@ -116,10 +116,26 @@ router.get('/me', passport.authenticate('jwt', { session: false }), (req, res) =
 
 router.get('/:id', (req, res) => {
     let id = req.params.id;
-    User.findOne({ "_id": new ObjectId(id)}, (err, user) => {
-        if(err) next(err);
-        res.json(user);
+    User.aggregate([
+        {
+            '$match': {
+                '_id': new ObjectId(id)
+            }
+        }, {
+            '$lookup': {
+                'from': 'stories',
+                'localField': '_id',
+                'foreignField': 'author',
+                'as': 'stories'
+            }
+        }
+    ]).exec(function(err, user) {
+       if (err) return err
+       else {
+           res.json(user[0])
+       }
     });
+
 });
 
 //get current user from token

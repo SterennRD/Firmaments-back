@@ -82,6 +82,7 @@ router.get('/:id', async function (req, res) {
                 'updated_at': 1,
                 'category': 1,
                 'rating': 1,
+                'status': 1,
                 'chapters': 1,
                 'nb_comments': {
                     '$sum': {
@@ -114,30 +115,6 @@ router.get('/:id', async function (req, res) {
 
 // Get last stories
 router.get('/last/posted', async function (req, res) {
-    /*Story.find(
-        {
-            '$lookup': {
-                'from': 'users',
-                'localField': '_id',
-                'foreignField': 'reading_lists',
-                'as': 'faved'
-            }
-        }, {
-            '$addFields': {
-                'nb_favorites': {
-                    '$size': '$faved'
-                }
-            }
-        }
-    ).sort('-created_at').populate('author').limit(10).exec(function(err, stories){
-        if (err)
-            return err
-        else {
-
-            console.log(stories[1].author.username);
-            res.json(stories);
-        }
-    });*/
     Story.aggregate([
         {
             '$lookup': {
@@ -167,6 +144,7 @@ router.get('/last/posted', async function (req, res) {
                 'updated_at': 1,
                 'category': 1,
                 'rating': 1,
+                'status': 1,
                 'chapters': 1,
                 'nb_comments': {
                     '$sum': {
@@ -222,9 +200,11 @@ router.post('/', VerifyToken, function(req, res, next) {
 router.post('/edit/:id', VerifyToken, function(req, res, next) {
     console.log("les modifs arrivent")
     console.log(req.body)
-    var query = { _id: new ObjectId(req.body._id) };
-    Story.findOneAndUpdate(query,{$set: req.body} , function (err, story) {
-        return res.json(req.body);
+    const id = req.body._id;
+    const query = { _id: new ObjectId(id) };
+    const body = {...req.body, updated_at: new Date()}
+    Story.findOneAndUpdate(query,{$set: body} , function (err, story) {
+        return res.json(story);
     })
 });
 
