@@ -32,17 +32,84 @@ router.get('/user/:id', async function (req, res) {
 router.get('/:id', async function (req, res) {
     var id = req.params.id;
 
-    let story = await Story.findOne({ _id: new ObjectId(id) }).lean().exec();
-    let newStory = story;
 
-    let author = User.findById(story.author, 'username', { lean: true }).exec(function (err, foundAuthor){
-        if(err) {
+    /*Story.findOne({ _id: new ObjectId(id) }).populate('author').lean().exec(function(err, stories){
+        if (err)
             return err
-        } else {
-            newStory = { ...story, author: foundAuthor}
+        else {
+            const newStory = {
+            ...stories,
+            author: {
+                _id: stories.author._id,
+                username: stories.author.username,
+                username_display: stories.author.username_display
+                },
+            }
             res.json(newStory);
         }
+    });*/
+
+    Story.aggregate([
+        {
+            '$match': {
+                '_id': new ObjectId(id)
+            }
+        }, {
+            '$lookup': {
+                'from': 'users',
+                'localField': '_id',
+                'foreignField': 'reading_lists.stories',
+                'as': 'faved'
+            }
+        }, {
+            '$lookup': {
+                'from': 'users',
+                'localField': 'author',
+                'foreignField': '_id',
+                'as': 'author'
+            }
+        }, {
+            '$unwind': {
+                'path': '$author'
+            }
+        }, {
+            '$project': {
+                'title': 1,
+                'author.username': 1,
+                'author.username_display': 1,
+                'author._id': 1,
+                'description': 1,
+                'updated_at': 1,
+                'category': 1,
+                'rating': 1,
+                'chapters': 1,
+                'nb_comments': {
+                    '$sum': {
+                        '$map': {
+                            'input': '$chapters',
+                            'as': 'c',
+                            'in': {
+                                '$size': '$$c.comments'
+                            }
+                        }
+                    }
+                },
+                'nb_favorites': {
+                    '$size': '$faved'
+                },
+                'nb_likes': {
+                    '$size': '$likes'
+                }
+            }
+        }
+    ]).exec(function(err, stories){
+        if (err)
+            return err
+        else {
+            res.json(stories);
+        }
     });
+
 });
 
 // Get last stories
@@ -146,7 +213,7 @@ router.post('/', VerifyToken, function(req, res, next) {
     });
 
     story.save((err, newStory) => {
-        if(err) console.log(err);next(err);
+        if(err) next(err);
         res.json(newStory);
     });
 });
