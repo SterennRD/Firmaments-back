@@ -148,7 +148,7 @@ router.get('/last/posted', async function (req, res) {
             }
         }, {
             '$unwind': {
-                'path': '$chapters'
+                'path': '$author'
             }
         }, {
             '$lookup': {
@@ -158,36 +158,36 @@ router.get('/last/posted', async function (req, res) {
                 'as': 'faved'
             }
         }, {
-            '$addFields': {
+            '$project': {
+                'title': 1,
+                'author.username': 1,
+                'author.username_display': 1,
+                'author._id': 1,
+                'description': 1,
+                'updated_at': 1,
+                'category': 1,
+                'rating': 1,
+                'chapters': 1,
+                'nb_comments': {
+                    '$sum': {
+                        '$map': {
+                            'input': '$chapters',
+                            'as': 'c',
+                            'in': {
+                                '$size': '$$c.comments'
+                            }
+                        }
+                    }
+                },
                 'nb_favorites': {
                     '$size': '$faved'
                 },
-                'nb_comments': {
-                    '$size': '$chapters.comments'
+                'nb_likes': {
+                    '$size': '$likes'
                 }
             }
         }, {
-            '$unwind': {
-                'path': '$author',
-                'preserveNullAndEmptyArrays': true
-            }
-        }, {
-            '$project': {
-                'faved': 0,
-                'author.reading_lists': 0,
-                'author.badges': 0
-            }
-        }, {
-            '$group': {
-                '_id': '$_id',
-                'doc': {
-                    '$first': '$$ROOT'
-                }
-            }
-        }, {
-            '$replaceRoot': {
-                'newRoot': '$doc'
-            }
+            '$limit': 10
         }, {
             '$sort': {
                 'created_at': 1
