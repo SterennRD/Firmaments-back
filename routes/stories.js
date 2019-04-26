@@ -213,7 +213,7 @@ router.get('/:id', async function (req, res) {
     Story.aggregate([
         {
             '$match': {
-                '_id': new ObjectId(id)
+                '_id': new ObjectId('5c9ca2a8a885bd809be23bfc')
             }
         }, {
             '$lookup': {
@@ -257,6 +257,30 @@ router.get('/:id', async function (req, res) {
                 'all_comments.created_at': -1
             }
         }, {
+            '$lookup': {
+                'from': 'users',
+                'localField': 'all_comments.author',
+                'foreignField': '_id',
+                'as': 'all_comments.author'
+            }
+        }, {
+            '$unwind': {
+                'path': '$all_comments.author'
+            }
+        }, {
+            '$project': {
+                'all_comments.author.password': 0,
+                'all_comments.author.followers': 0,
+                'all_comments.author.following': 0,
+                'all_comments.author.reading_lists': 0,
+                'all_comments.author.email': 0,
+                'all_comments.author.created_at': 0,
+                'all_comments.author.badges': 0,
+                'all_comments.author.notes': 0,
+                'all_comments.author.todo_lists': 0,
+                'all_comments.author.birth_date': 0
+            }
+        }, {
             '$group': {
                 '_id': '$_id',
                 'doc': {
@@ -284,7 +308,6 @@ router.get('/:id', async function (req, res) {
                 'updated_at': 1,
                 'category': 1,
                 'rating': 1,
-                'status': 1,
                 'chapters': 1,
                 'likes': 1,
                 'nb_comments': {
