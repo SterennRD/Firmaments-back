@@ -183,6 +183,7 @@ router.get('/:id', async function (req, res) {
                 'rating': 1,
                 'status': 1,
                 'chapters': 1,
+                'likes': 1,
                 'nb_comments': {
                     '$sum': {
                         '$map': {
@@ -304,6 +305,34 @@ router.post('/edit/:id', VerifyToken, function(req, res, next) {
     const body = {...req.body, updated_at: new Date()}
     Story.findOneAndUpdate(query,{$set: body} , function (err, story) {
         return res.json(story);
+    })
+});
+
+// Add like
+router.post('/like/:id', VerifyToken, function(req, res, next) {
+    console.log("les modifs arrivent")
+    console.log(req.body)
+    const id = req.body.id;
+    const idStory = req.params.id;
+    const query = { _id: new ObjectId(idStory), "likes": { $elemMatch: {user : new ObjectId(id)}}};
+
+    /*Story.findOneAndUpdate(query,{ $push: { "likes": {user: new ObjectId(id)} } }, function (err, story) {
+        return res.json(story);
+    })*/
+    Story.findOneAndUpdate(query,{ $pull: { "likes": {user: new ObjectId(id)} } }, {new: true}, function (err, story) {
+        if(err){return next(err);}
+        if (!story) {
+            console.log("pas de like")
+            Story.findOneAndUpdate({ _id: new ObjectId(idStory)},{ $push: { "likes": {user: new ObjectId(id)} } }, {new: true}, function (err, story) {
+                if(err){return next(err)};
+                console.log(story.likes)
+                res.json(story.likes);
+            });
+        } else {
+            console.log("je like déjà, je supprime")
+            console.log(story.likes)
+            res.json(story.likes);
+        }
     })
 });
 

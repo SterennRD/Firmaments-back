@@ -205,10 +205,11 @@ StorySchema.statics.paginate = function(pageNo, callback){
         }
         else{
             var result = {
-                "totalRecords" : totalCount,
+                "totalResults" : totalCount,
                 "page": pageNo,
                 "nextPage": parseInt(pageNo) + 1,
-                "result": docs
+                "result": docs,
+                "resultsPerPage": limit
             };
             return callback(null, result);
         }
