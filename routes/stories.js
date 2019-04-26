@@ -148,7 +148,7 @@ router.get('/:id', async function (req, res) {
         }
     });*/
 
-    Story.aggregate([
+    /*Story.aggregate([
         {
             '$match': {
                 '_id': new ObjectId(id)
@@ -207,6 +207,115 @@ router.get('/:id', async function (req, res) {
         if (err)
             return err
         else {
+            res.json(story[0]);
+        }
+    });*/
+    Story.aggregate([
+        {
+            '$match': {
+                '_id': new ObjectId(id)
+            }
+        }, {
+            '$lookup': {
+                'from': 'users',
+                'localField': '_id',
+                'foreignField': 'reading_lists.stories',
+                'as': 'faved'
+            }
+        }, {
+            '$lookup': {
+                'from': 'users',
+                'localField': 'author',
+                'foreignField': '_id',
+                'as': 'author'
+            }
+        }, {
+            '$unwind': {
+                'path': '$author'
+            }
+        }, {
+            '$addFields': {
+                'all_comments': {
+                    '$reduce': {
+                        'input': '$chapters.comments',
+                        'initialValue': [],
+                        'in': {
+                            '$concatArrays': [
+                                '$$value', '$$this'
+                            ]
+                        }
+                    }
+                }
+            }
+        }, {
+            '$unwind': {
+                'path': '$all_comments',
+                'preserveNullAndEmptyArrays': true
+            }
+        }, {
+            '$sort': {
+                'all_comments.created_at': -1
+            }
+        }, {
+            '$group': {
+                '_id': '$_id',
+                'doc': {
+                    '$first': '$$ROOT'
+                },
+                'all_comments': {
+                    '$push': '$all_comments'
+                }
+            }
+        }, {
+            '$addFields': {
+                'doc.all_comments': '$all_comments'
+            }
+        }, {
+            '$replaceRoot': {
+                'newRoot': '$doc'
+            }
+        }, {
+            '$project': {
+                'title': 1,
+                'author.username': 1,
+                'author.username_display': 1,
+                'author._id': 1,
+                'description': 1,
+                'updated_at': 1,
+                'category': 1,
+                'rating': 1,
+                'status': 1,
+                'chapters': 1,
+                'likes': 1,
+                'nb_comments': {
+                    '$sum': {
+                        '$map': {
+                            'input': '$chapters',
+                            'as': 'c',
+                            'in': {
+                                '$size': '$$c.comments'
+                            }
+                        }
+                    }
+                },
+                'nb_favorites': {
+                    '$size': '$faved'
+                },
+                'nb_likes': {
+                    '$size': '$likes'
+                },
+                'last_comments': {
+                    '$slice': [
+                        '$all_comments', 10
+                    ]
+                }
+            }
+        }
+    ]).exec(function(err, story){
+        if (err)
+            return err
+        else {
+            console.log(story)
             res.json(story[0]);
         }
     });
