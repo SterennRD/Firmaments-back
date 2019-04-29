@@ -4,14 +4,15 @@ function generateToken(user) {
     //Dont use password and other sensitive fields
     //Use fields that are useful in other parts of the app/collections/models
     var u = {
-        name: user.name,
+        _id: user._id,
+        email: user.email,
+        username_display: user.username_display,
         username: user.username,
-        role: user.role,
-        _id: user._id.toString(),
-        image: user.image
+        birth_date: user.birth_date,
+        following: user.following,
     };
 
-    return token = jwt.sign(u, process.env.JWT_SECRET, {
+    return token = jwt.sign({ user : u }, process.env.JWT_SECRET, {
         expiresIn: 60 * 60 * 24 // expires in 24 hours
     });
 }
@@ -30,6 +31,8 @@ function getCleanUser(user) {
         created_at: u.created_at,
         birth_date: u.birth_date,
         image: u.image,
+        following: u.following,
+        followers: u.followers,
     }
 }
 

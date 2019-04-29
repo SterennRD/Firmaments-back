@@ -98,7 +98,7 @@ router.post('/login', (req, res, next) => {
                 username_display: user.username_display,
                 username: user.username,
                 birth_date: user.birth_date,
-                following: user.following
+                following: user.following,
             };
             const token = jwt.sign({ user : body }, process.env.JWT_SECRET, {
                 expiresIn: 86400 // expires in 24 hours
@@ -175,7 +175,7 @@ router.post('/follow/:id/:follow', VerifyToken, function(req, res, next) {
 //get current user from token
 router.get('/me/from/token', function(req, res, next) {
     // check header or url parameters or post parameters for token
-    var token = req.body.token || req.query.token;
+    var token = req.body.token || req.query.token || req.headers['x-access-token'];
     if (!token) {
         return res.status(401).json({message: 'Must pass token'});
     }
@@ -184,19 +184,21 @@ router.get('/me/from/token', function(req, res, next) {
     jwt.verify(token, process.env.JWT_SECRET, function(err, user) {
         if (err) throw err;
         //return user using the id from w/in JWTToken
+        console.log(user)
+        console.log(user.user._id)
         User.findById({
-    '_id': user._id
+    '_id': user.user._id
     }, function(err, user) {
             if (err) throw err;
             user = utils.getCleanUser(user);
             //Note: you can renew token by creating new token(i.e.
             //refresh it)w/ new expiration time at this point, but I’m
             //passing the old token back.
-            // var token = utils.generateToken(user);
+            var token = utils.generateToken(user);
             res.json({
                 user: user,
-            token: token
-        });
+                token: token
+            });
         });
     });
 });
