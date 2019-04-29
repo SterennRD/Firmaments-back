@@ -1,3 +1,4 @@
+
 const mongoose = require('mongoose');
 const Schema = mongoose.Schema;
 
@@ -219,5 +220,7 @@ StorySchema.statics.paginate = function(pageNo, callback){
 };
 
 const StoryModel = mongoose.model('Story', StorySchema);
+
+
 
 module.exports = StoryModel;

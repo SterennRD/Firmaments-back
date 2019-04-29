@@ -608,6 +608,51 @@ router.delete('/:id', VerifyToken, async function (req, res, next) {
     //res.json(stories);
 });
 
+// Search story
+router.get('/search/story', async function (req, res) {
+    const searchWords = req.query.search;
+    console.log(req.query)
+    //
+    //const searchWords = "qui";
 
+    var regex = new RegExp(req.query.search, 'i');
+    var query = Story.find({title: regex}, { 'title': 1 }).populate({ path: 'author', select: 'username_display' }).sort({"updated_at":-1}).sort({"created_at":-1});
+
+    // Execute query in a callback and return users list
+        var totalCount;
+    Story.countDocuments({title: regex}, function(err, count) {
+        console.log(count)
+        if (err){
+            totalCount = 0;
+        }
+        else{
+            totalCount = count;
+        }
+    });
+    query.limit(5).exec(function(err, stories) {
+        if (!err) {
+            // Method to construct the json result set
+            //count documents
+
+            var result = {
+                "totalResults" : totalCount,
+                "result": stories,
+            };
+            res.send(result);
+        } else {
+            res.send(JSON.stringify(err), {
+                'Content-Type': 'application/json'
+            }, 404);
+        }
+    });
+    /*Story.find( { $text: { $search : searchWords, "$caseSensitive": false, "$diacriticSensitive": false } },{ score : { $meta: "textScore" } } ).sort( {
+        score: { $meta : "textScore" }} ).exec((err, doc) => {
+        if (err) {
+            console.log(err)
+        } else {
+            res.json(doc);
+        }
+    });*/
+});
 
 module.exports = router;
