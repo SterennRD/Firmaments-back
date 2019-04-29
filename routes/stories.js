@@ -213,7 +213,7 @@ router.get('/:id', async function (req, res) {
     Story.aggregate([
         {
             '$match': {
-                '_id': new ObjectId('5c9ca2a8a885bd809be23bfc')
+                '_id': new ObjectId(id)
             }
         }, {
             '$lookup': {
@@ -232,6 +232,33 @@ router.get('/:id', async function (req, res) {
         }, {
             '$unwind': {
                 'path': '$author'
+            }
+        }, {
+            '$unwind': {
+                'path': '$chapters'
+            }
+        }, {
+            '$addFields': {
+                'chapters.comments.title': '$chapters.title',
+                'chapters.comments.chapter_id': '$chapters._id'
+            }
+        }, {
+            '$group': {
+                '_id': '$_id',
+                'doc': {
+                    '$first': '$$ROOT'
+                },
+                'chap': {
+                    '$push': '$chapters'
+                }
+            }
+        }, {
+            '$addFields': {
+                'doc.chapters': '$chap'
+            }
+        }, {
+            '$replaceRoot': {
+                'newRoot': '$doc'
             }
         }, {
             '$addFields': {
@@ -265,7 +292,8 @@ router.get('/:id', async function (req, res) {
             }
         }, {
             '$unwind': {
-                'path': '$all_comments.author'
+                'path': '$all_comments.author',
+                'preserveNullAndEmptyArrays': true
             }
         }, {
             '$project': {
@@ -278,7 +306,9 @@ router.get('/:id', async function (req, res) {
                 'all_comments.author.badges': 0,
                 'all_comments.author.notes': 0,
                 'all_comments.author.todo_lists': 0,
-                'all_comments.author.birth_date': 0
+                'all_comments.author.birth_date': 0,
+                'chapters.comments.title': 0,
+                'chapters.comments.chapter_id': 0
             }
         }, {
             '$group': {
@@ -328,9 +358,23 @@ router.get('/:id', async function (req, res) {
                     '$size': '$likes'
                 },
                 'last_comments': {
-                    '$slice': [
-                        '$all_comments', 10
-                    ]
+                    '$cond': {
+                        'if': {
+                            '$eq': [
+                                {
+                                    '$arrayElemAt': [
+                                        '$all_comments', 0
+                                    ]
+                                }, {}
+                            ]
+                        },
+                        'then': [],
+                        'else': {
+                            '$slice': [
+                                '$all_comments', 10
+                            ]
+                        }
+                    }
                 }
             }
         }
