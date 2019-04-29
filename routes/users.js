@@ -9,6 +9,7 @@ const ExtractJwt = require('passport-jwt').ExtractJwt;
 const validateRegisterInput = require('../validation/register');
 const validateLoginInput = require('../validation/login');
 var utils = require('../utils/index');
+var VerifyToken = require('../auth/VerifyToken');
 
 const User = require('../model/User');
 var ObjectId = require('mongoose').Types.ObjectId;
@@ -96,7 +97,8 @@ router.post('/login', (req, res, next) => {
                 email: user.email,
                 username_display: user.username_display,
                 username: user.username,
-                birth_date: user.birth_date
+                birth_date: user.birth_date,
+                following: user.following
             };
             const token = jwt.sign({ user : body }, process.env.JWT_SECRET, {
                 expiresIn: 86400 // expires in 24 hours
@@ -136,6 +138,38 @@ router.get('/:id', (req, res) => {
        }
     });
 
+});
+
+// Follow or unfollow user
+router.post('/follow/:id/:follow', VerifyToken, function(req, res, next) {
+
+    // connected user
+    const id = req.params.id;
+    // user to follow
+    const follow = req.params.follow;
+    const query = { _id: new ObjectId(id), "following": { $elemMatch: {_id : new ObjectId(follow)}}};
+
+    User.findOneAndUpdate(query,{ $pull: { "following": {_id: new ObjectId(follow)} } }, {new: true}, function (err, user) {
+        if(err){return next(err);}
+        if (!user) {
+            // User is not in the following list : add it
+            User.findOneAndUpdate({ _id: new ObjectId(id)},{ $push: { "following": {_id: new ObjectId(follow)} } }, {new: true}, function (err, user) {
+                if(err){return next(err)};
+                // Update followers list for the user followed
+                User.findOneAndUpdate({ _id: new ObjectId(follow) },{ $push: { "followers": {_id: new ObjectId(id)} } }, function (err, userFollowed) {
+
+                });
+                res.json(user);
+            });
+        } else {
+            // User is in the following list : delete it
+            // Update followers list for the user followed
+            User.findOneAndUpdate({ _id: new ObjectId(follow) },{ $pull: { "followers": {_id: new ObjectId(id)} } }, function (err, userFollowed) {
+
+            });
+            res.json(user);
+        }
+    })
 });
 
 //get current user from token

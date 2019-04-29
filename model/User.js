@@ -43,12 +43,16 @@ const UserSchema = new Schema({
         ref: 'Badge'
     }],
     followers:  [{
-        type: Schema.Types.ObjectId,
-        ref: 'User'
+        _id: {
+            type: Schema.Types.ObjectId,
+            ref: 'User'
+        }
     }],
     following:  [{
-        type: Schema.Types.ObjectId,
-        ref: 'User'
+        _id: {
+            type: Schema.Types.ObjectId,
+            ref: 'User'
+        }
     }],
     notes: [{
         created_at: {
