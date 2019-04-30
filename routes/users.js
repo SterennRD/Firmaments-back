@@ -152,22 +152,30 @@ router.post('/follow/:id/:follow', VerifyToken, function(req, res, next) {
     User.findOneAndUpdate(query,{ $pull: { "following": {_id: new ObjectId(follow)} } }, {new: true}, function (err, user) {
         if(err){return next(err);}
         if (!user) {
+            console.log('user pas trouvé')
             // User is not in the following list : add it
             User.findOneAndUpdate({ _id: new ObjectId(id)},{ $push: { "following": {_id: new ObjectId(follow)} } }, {new: true}, function (err, user) {
                 if(err){return next(err)};
                 // Update followers list for the user followed
-                User.findOneAndUpdate({ _id: new ObjectId(follow) },{ $push: { "followers": {_id: new ObjectId(id)} } }, function (err, userFollowed) {
-
+                let response = { user: user.following };
+                User.findOneAndUpdate({ _id: new ObjectId(follow) },{ $push: { "followers": {_id: new ObjectId(id)} } }, {new: true}, function (err, userFollowed) {
+                    const followersList = userFollowed.followers;
+                    response = { ...response, followersList : followersList };
+                    res.json(response);
                 });
-                res.json(user);
+
             });
         } else {
             // User is in the following list : delete it
             // Update followers list for the user followed
-            User.findOneAndUpdate({ _id: new ObjectId(follow) },{ $pull: { "followers": {_id: new ObjectId(id)} } }, function (err, userFollowed) {
-
+            let response = { user: user.following };
+            User.findOneAndUpdate({ _id: new ObjectId(follow) },{ $pull: { "followers": {_id: new ObjectId(id)} } }, {new: true}, function (err, userFollowed) {
+                const followersList = userFollowed.followers;
+                console.log(userFollowed)
+                response = { ...response, followersList : followersList };
+                res.json(response);
             });
-            res.json(user);
+            //res.json(user);
         }
     })
 });

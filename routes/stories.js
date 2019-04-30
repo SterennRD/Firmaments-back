@@ -2,11 +2,25 @@ var express = require('express');
 var router = express.Router();
 const mongoose = require('mongoose');
 const Story = require('../model/Story');
+const path = require('path');
 
 const User = require('../model/User');
 var ObjectId = require('mongoose').Types.ObjectId;
 const jwt = require('jsonwebtoken');
 var VerifyToken = require('../auth/VerifyToken');
+
+
+var multer = require('multer');
+var storage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        cb(null, './public/images/uploads')
+    },
+    filename: (req, file, cb) => {
+        cb(null, file.fieldname + '-' + Date.now() + path.extname(file.originalname))
+    }
+});
+var upload = multer({storage: storage});
+//var upload = multer({ dest: 'uploads/' });
 
 // Get all stories
 router.get('/', function(req, res) {
@@ -340,6 +354,7 @@ router.get('/:id', async function (req, res) {
                 'rating': 1,
                 'chapters': 1,
                 'likes': 1,
+                'status': 1,
                 'nb_comments': {
                     '$sum': {
                         '$map': {
@@ -392,6 +407,11 @@ router.get('/:id', async function (req, res) {
 // Get last stories
 router.get('/last/posted', async function (req, res) {
     Story.aggregate([
+        {
+            '$match' : {
+                "status.label": {"$ne" : "Brouillon"}
+            }
+        },
         {
             '$lookup': {
                 'from': 'users',
@@ -473,15 +493,17 @@ router.post('/', VerifyToken, function(req, res, next) {
 });
 
 // Edit a story
-router.post('/edit/:id', VerifyToken, function(req, res, next) {
+router.post('/edit/:id', upload.single('cover'), VerifyToken, function(req, res, next) {
     console.log("les modifs arrivent")
-    console.log(req.body)
+    console.log(req.body);
+    console.log(req.file)
+    console.log(req.files)
     const id = req.body._id;
     const query = { _id: new ObjectId(id) };
     const body = {...req.body, updated_at: new Date()}
-    Story.findOneAndUpdate(query,{$set: body} , function (err, story) {
+    /*Story.findOneAndUpdate(query,{$set: body} , function (err, story) {
         return res.json(story);
-    })
+    })*/
 });
 
 // Add like

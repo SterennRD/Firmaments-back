@@ -8,6 +8,9 @@ require('dotenv').config();
 const passport = require('passport');
 const mongoose = require('mongoose');
 const jwt = require('jsonwebtoken');
+var fs = require('file-system');
+var multer = require('multer');
+
 
 var indexRouter = require('./routes/index');
 var usersRouter = require('./routes/users');
@@ -49,7 +52,6 @@ app.use(cors());
 require('./auth/auth');
 app.use(passport.initialize());
 require('./passport')(passport);
-
 
 //middleware that checks if JWT token exists and verifies it if it does exist.
 //In all the future routes, this helps to know if the request is authenticated or not.
