@@ -77,7 +77,7 @@ const StorySchema = new Schema({
         required: true,
         maxlength: 350
     },
-    cover: { data: Buffer, contentType: String },
+    cover: String,
     created_at: {
         type: Date,
         default: Date.now

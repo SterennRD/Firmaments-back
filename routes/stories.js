@@ -355,6 +355,7 @@ router.get('/:id', async function (req, res) {
                 'chapters': 1,
                 'likes': 1,
                 'status': 1,
+                'cover': 1,
                 'nb_comments': {
                     '$sum': {
                         '$map': {
@@ -442,6 +443,7 @@ router.get('/last/posted', async function (req, res) {
                 'rating': 1,
                 'status': 1,
                 'chapters': 1,
+                'cover': 1,
                 'nb_comments': {
                     '$sum': {
                         '$map': {
@@ -496,14 +498,20 @@ router.post('/', VerifyToken, function(req, res, next) {
 router.post('/edit/:id', upload.single('cover'), VerifyToken, function(req, res, next) {
     console.log("les modifs arrivent")
     console.log(req.body);
-    console.log(req.file)
-    console.log(req.files)
-    const id = req.body._id;
+    console.log(JSON.parse(req.body.postData));
+    console.log(req.file);
+    const id = req.params.id;
     const query = { _id: new ObjectId(id) };
-    const body = {...req.body, updated_at: new Date()}
-    /*Story.findOneAndUpdate(query,{$set: body} , function (err, story) {
+    let body;
+    if (req.file) {
+        body = {...req.body, updated_at: new Date(), cover: req.file.filename};
+    } else {
+        body = {...JSON.parse(req.body.postData), updated_at: new Date()};
+    }
+    Story.findOneAndUpdate(query,{$set: body}, { new: true} , function (err, story) {
+        if (err) return err
         return res.json(story);
-    })*/
+    })
 });
 
 // Add like
