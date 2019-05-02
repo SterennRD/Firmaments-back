@@ -407,7 +407,7 @@ router.get('/:id', async function (req, res) {
 
 // Get last stories
 router.get('/last/posted', async function (req, res) {
-    Story.aggregate([
+    /*Story.aggregate([
         {
             '$match' : {
                 "status.label": {"$ne" : "Brouillon"}
@@ -467,6 +467,129 @@ router.get('/last/posted', async function (req, res) {
         }, {
             '$sort': {
                 'created_at': 1
+            }
+        }
+    ]).exec(function(err, stories){
+        if (err)
+            return err
+        else {
+            res.json(stories);
+        }
+    });*/
+    Story.aggregate([
+        {
+            '$match': {
+                'status.label': {
+                    '$ne': 'Brouillon'
+                }
+            }
+        }, {
+            '$lookup': {
+                'from': 'users',
+                'localField': 'author',
+                'foreignField': '_id',
+                'as': 'author'
+            }
+        }, {
+            '$lookup': {
+                'from': 'users',
+                'localField': '_id',
+                'foreignField': 'reading_lists.stories',
+                'as': 'faved'
+            }
+        }, {
+            '$unwind': {
+                'path': '$author'
+            }
+        }, {
+            '$group': {
+                '_id': '$_id',
+                'total_fav': {
+                    '$push': {
+                        '$reduce': {
+                            'input': {
+                                '$reduce': {
+                                    'input': '$faved.reading_lists.stories',
+                                    'initialValue': [],
+                                    'in': {
+                                        '$concatArrays': [
+                                            '$$value', '$$this'
+                                        ]
+                                    }
+                                }
+                            },
+                            'initialValue': [],
+                            'in': {
+                                '$concatArrays': [
+                                    '$$value', '$$this'
+                                ]
+                            }
+                        }
+                    }
+                },
+                'doc': {
+                    '$first': '$$ROOT'
+                }
+            }
+        }, {
+            '$unwind': {
+                'path': '$total_fav',
+                'preserveNullAndEmptyArrays': true
+            }
+        }, {
+            '$addFields': {
+                'doc.all_faved': '$total_fav'
+            }
+        }, {
+            '$replaceRoot': {
+                'newRoot': '$doc'
+            }
+        }, {
+            '$project': {
+                'title': 1,
+                'author.username': 1,
+                'author.username_display': 1,
+                'author._id': 1,
+                'description': 1,
+                'updated_at': 1,
+                'category': 1,
+                'rating': 1,
+                'chapters': 1,
+                'likes': 1,
+                'status': 1,
+                'nb_comments': {
+                    '$sum': {
+                        '$map': {
+                            'input': '$chapters',
+                            'as': 'c',
+                            'in': {
+                                '$size': '$$c.comments'
+                            }
+                        }
+                    }
+                },
+                'nb_likes': {
+                    '$size': '$likes'
+                },
+                'nb_favorites': {
+                    '$size': {
+                        '$filter': {
+                            'input': '$all_faved',
+                            'as': 't',
+                            'cond': {
+                                '$eq': [
+                                    '$$t', '$_id'
+                                ]
+                            }
+                        }
+                    }
+                }
+            }
+        }, {
+            '$limit': 10
+        }, {
+            '$sort': {
+                'updated_at': 1
             }
         }
     ]).exec(function(err, stories){

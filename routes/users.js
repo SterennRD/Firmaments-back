@@ -12,6 +12,7 @@ var utils = require('../utils/index');
 var VerifyToken = require('../auth/VerifyToken');
 const tokenList = {}
 const User = require('../model/User');
+const Story = require('../model/Story');
 var ObjectId = require('mongoose').Types.ObjectId;
 
 router.get('/', function(req, res) {
@@ -233,7 +234,7 @@ router.get('/me/from/token', function(req, res, next) {
 });
 
 // Add story to reading list
-router.post('/add/readinglist/:id/:idStory', VerifyToken, function(req, res, next) {
+router.post('/add/readinglist/:id/:idStory', VerifyToken, async function(req, res, next) {
 
     const id = req.params.id;
     const idStory = req.params.idStory;
@@ -243,17 +244,138 @@ router.post('/add/readinglist/:id/:idStory', VerifyToken, function(req, res, nex
     const query = {"reading_lists":{"$elemMatch":{_id: new ObjectId(id), stories:{ $in: [ new ObjectId(idStory)] }}} };
     //{"reading_lists":{"$elemMatch":{_id:ObjectId('5ccaac9ff85b1592446b73d8'), stories:{ $in: [ObjectId('5c9ca2a8a885bd809be23bfc')] }}} }
 
+    const queryStory = [
+        {
+            '$match': {
+                '_id': new ObjectId(idStory),
+                'status.label': {
+                    '$ne': 'Brouillon'
+                }
+            }
+        }, {
+            '$lookup': {
+                'from': 'users',
+                'localField': 'author',
+                'foreignField': '_id',
+                'as': 'author'
+            }
+        }, {
+            '$lookup': {
+                'from': 'users',
+                'localField': '_id',
+                'foreignField': 'reading_lists.stories',
+                'as': 'faved'
+            }
+        }, {
+            '$unwind': {
+                'path': '$author'
+            }
+        }, {
+            '$group': {
+                '_id': '$_id',
+                'total_fav': {
+                    '$push': {
+                        '$reduce': {
+                            'input': {
+                                '$reduce': {
+                                    'input': '$faved.reading_lists.stories',
+                                    'initialValue': [],
+                                    'in': {
+                                        '$concatArrays': [
+                                            '$$value', '$$this'
+                                        ]
+                                    }
+                                }
+                            },
+                            'initialValue': [],
+                            'in': {
+                                '$concatArrays': [
+                                    '$$value', '$$this'
+                                ]
+                            }
+                        }
+                    }
+                },
+                'doc': {
+                    '$first': '$$ROOT'
+                }
+            }
+        }, {
+            '$unwind': {
+                'path': '$total_fav',
+                'preserveNullAndEmptyArrays': true
+            }
+        }, {
+            '$addFields': {
+                'doc.all_faved': '$total_fav'
+            }
+        }, {
+            '$replaceRoot': {
+                'newRoot': '$doc'
+            }
+        }, {
+            '$project': {
+                'title': 1,
+                'author.username': 1,
+                'author.username_display': 1,
+                'author._id': 1,
+                'description': 1,
+                'updated_at': 1,
+                'category': 1,
+                'rating': 1,
+                'chapters': 1,
+                'likes': 1,
+                'status': 1,
+                'nb_comments': {
+                    '$sum': {
+                        '$map': {
+                            'input': '$chapters',
+                            'as': 'c',
+                            'in': {
+                                '$size': '$$c.comments'
+                            }
+                        }
+                    }
+                },
+                'nb_likes': {
+                    '$size': '$likes'
+                },
+                'nb_favorites': {
+                    '$size': {
+                        '$filter': {
+                            'input': '$all_faved',
+                            'as': 't',
+                            'cond': {
+                                '$eq': [
+                                    '$$t', '$_id'
+                                ]
+                            }
+                        }
+                    }
+                }
+            }
+        }, {
+            '$limit': 10
+        }, {
+            '$sort': {
+                'updated_at': 1
+            }
+        }
+    ];
 
-    User.findOneAndUpdate(query,{$pull:{"reading_lists.$.stories":new ObjectId(idStory)}}, {new: true}, function (err, user) {
+
+    User.findOneAndUpdate(query,{$pull:{"reading_lists.$.stories":new ObjectId(idStory)}}, {new: true}, async function (err, user) {
         if (err) throw err
         if (!user) {
-            User.findOneAndUpdate({"reading_lists":{"$elemMatch":{_id:new ObjectId(id)}}} ,{$push:{"reading_lists.$.stories":new ObjectId(idStory)}}, {new: true}, function (err, user) {
+            User.findOneAndUpdate({"reading_lists":{"$elemMatch":{_id:new ObjectId(id)}}} ,{$push:{"reading_lists.$.stories":new ObjectId(idStory)}}, {new: true}, async function (err, user) {
                 if (err) throw err
-                res.json(user)
+                let story = await Story.aggregate(queryStory).exec();
+                res.json({user: user, story: story[0]})
             });
 
         } else {
-            res.json(user)
+            let story = await Story.aggregate(queryStory).exec();
+            res.json({user: user, story: story[0]})
         }
     });
 
