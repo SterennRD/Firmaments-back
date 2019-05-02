@@ -10,7 +10,7 @@ const validateRegisterInput = require('../validation/register');
 const validateLoginInput = require('../validation/login');
 var utils = require('../utils/index');
 var VerifyToken = require('../auth/VerifyToken');
-
+const tokenList = {}
 const User = require('../model/User');
 var ObjectId = require('mongoose').Types.ObjectId;
 
@@ -104,6 +104,16 @@ router.post('/login', (req, res, next) => {
                 expiresIn: 86400 // expires in 24 hours
             });
             return res.json({ user, token: token });
+            /*const token = jwt.sign({ user : body }, process.env.JWT_SECRET, { expiresIn: process.env.tokenLife})
+            const refreshToken = jwt.sign({ user : body }, process.env.refreshTokenSecret, { expiresIn: process.env.refreshTokenLife})
+            const response = {
+                user,
+                token: token,
+                refreshToken: refreshToken
+            }
+            tokenList[refreshToken] = response
+            console.log(tokenList)
+            return res.json(response);*/
         });
     })(req, res, next);
 });
@@ -187,13 +197,15 @@ router.get('/me/from/token', function(req, res, next) {
     if (!token) {
         return res.status(401).json({message: 'Must pass token'});
     }
-    console.log(token)
+    const postData = req.body
+    console.log(postData)
+    console.log("tokenList")
+    console.log(tokenList)
+
 // Check token that was passed by decoding token using secret
     jwt.verify(token, process.env.JWT_SECRET, function(err, user) {
         if (err) throw err;
         //return user using the id from w/in JWTToken
-        console.log(user)
-        console.log(user.user._id)
         User.findById({
     '_id': user.user._id
     }, function(err, user) {
