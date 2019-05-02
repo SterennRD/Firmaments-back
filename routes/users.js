@@ -239,7 +239,10 @@ router.post('/add/readinglist/:id/:idStory', VerifyToken, function(req, res, nex
     const idStory = req.params.idStory;
 
     //const query = { "reading_lists._id": new ObjectId(id), "reading_lists.stories": { $in: [new ObjectId(idStory)] } };
-    const query = {"reading_lists":{"$elemMatch":{_id:new ObjectId(id)}}, "reading_lists.stories": { $in: [new ObjectId(idStory)] } };
+    //const query = {"reading_lists":{"$elemMatch":{_id:new ObjectId(id)}}, "reading_lists.stories": { $in: [new ObjectId(idStory)] } };
+    const query = {"reading_lists":{"$elemMatch":{_id: new ObjectId(id), stories:{ $in: [ new ObjectId(idStory)] }}} };
+    //{"reading_lists":{"$elemMatch":{_id:ObjectId('5ccaac9ff85b1592446b73d8'), stories:{ $in: [ObjectId('5c9ca2a8a885bd809be23bfc')] }}} }
+
 
     User.findOneAndUpdate(query,{$pull:{"reading_lists.$.stories":new ObjectId(idStory)}}, {new: true}, function (err, user) {
         if (err) throw err
