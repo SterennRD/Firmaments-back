@@ -147,7 +147,16 @@ router.get('/:id', (req, res) => {
            res.json(user[0])
        }
     });
+});
 
+router.get('/reading-lists/:id', (req, res) => {
+    let id = req.params.id;
+    User.findOne({_id: new ObjectId(id)}).select({ "reading_lists": 1, "_id": 0}).exec(function(err, user) {
+        if (err) return err
+        else {
+            res.json(user)
+        }
+    });
 });
 
 // Follow or unfollow user
@@ -222,5 +231,30 @@ router.get('/me/from/token', function(req, res, next) {
         });
     });
 });
+
+// Add story to reading list
+router.post('/add/readinglist/:id/:idStory', VerifyToken, function(req, res, next) {
+
+    const id = req.params.id;
+    const idStory = req.params.idStory;
+
+    //const query = { "reading_lists._id": new ObjectId(id), "reading_lists.stories": { $in: [new ObjectId(idStory)] } };
+    const query = {"reading_lists":{"$elemMatch":{_id:new ObjectId(id)}}, "reading_lists.stories": { $in: [new ObjectId(idStory)] } };
+
+    User.findOneAndUpdate(query,{$pull:{"reading_lists.$.stories":new ObjectId(idStory)}}, {new: true}, function (err, user) {
+        if (err) throw err
+        if (!user) {
+            User.findOneAndUpdate({"reading_lists":{"$elemMatch":{_id:new ObjectId(id)}}} ,{$push:{"reading_lists.$.stories":new ObjectId(idStory)}}, {new: true}, function (err, user) {
+                if (err) throw err
+                res.json(user)
+            });
+
+        } else {
+            res.json(user)
+        }
+    });
+
+});
+
 
 module.exports = router;
