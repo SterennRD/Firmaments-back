@@ -129,7 +129,7 @@ router.get('/me', passport.authenticate('jwt', { session: false }), (req, res) =
 
 router.get('/:id', (req, res) => {
     let id = req.params.id;
-    User.aggregate([
+    /*User.aggregate([
         {
             '$match': {
                 '_id': new ObjectId(id)
@@ -243,6 +243,238 @@ router.get('/:id', (req, res) => {
                 'followers': 1,
                 'following': 1,
                 'nb_stories': 1,
+                'nb_readinglists': {
+                    '$size': {
+                        '$filter': {
+                            'input': '$reading_lists',
+                            'as': 'rl',
+                            'cond': {
+                                '$eq': [
+                                    '$$rl.private', false
+                                ]
+                            }
+                        }
+                    }
+                },
+                'reading_lists': 1,
+                'stories._id': 1,
+                'stories.title': 1,
+                'stories.nb_comments': 1,
+                'stories.nb_favorites': 1,
+                'stories.nb_likes': 1,
+                'stories.author.username': 1,
+                'stories.author.username_display': 1,
+                'stories.author._id': 1,
+                'stories.description': 1,
+                'stories.updated_at': 1,
+                'stories.category': 1,
+                'stories.rating': 1,
+                'stories.status': 1
+            }
+        }
+    ]).exec(function(err, user) {
+       if (err) return err
+       else {
+           res.json(user[0])
+       }
+    });*/
+    User.aggregate([
+        {
+            '$match': {
+                '_id': new ObjectId(id)
+            }
+        }, {
+            '$lookup': {
+                'from': 'stories',
+                'localField': '_id',
+                'foreignField': 'author',
+                'as': 'stories'
+            }
+        }, {
+            '$addFields': {
+                'nb_stories': {
+                    '$size': '$stories'
+                }
+            }
+        }, {
+            '$unwind': {
+                'path': '$stories',
+                'preserveNullAndEmptyArrays': true
+            }
+        }, {
+            '$lookup': {
+                'from': 'users',
+                'localField': 'stories._id',
+                'foreignField': 'reading_lists.stories',
+                'as': 'faved'
+            }
+        }, {
+            '$addFields': {
+                'stories.nb_favorites': {
+                    '$size': {
+                        '$filter': {
+                            'input': {
+                                '$reduce': {
+                                    'input': {
+                                        '$reduce': {
+                                            'input': '$faved.reading_lists.stories',
+                                            'initialValue': [],
+                                            'in': {
+                                                '$concatArrays': [
+                                                    '$$value', '$$this'
+                                                ]
+                                            }
+                                        }
+                                    },
+                                    'initialValue': [],
+                                    'in': {
+                                        '$concatArrays': [
+                                            '$$value', '$$this'
+                                        ]
+                                    }
+                                }
+                            },
+                            'as': 't',
+                            'cond': {
+                                '$eq': [
+                                    '$$t', '$stories._id'
+                                ]
+                            }
+                        }
+                    }
+                },
+                'stories.nb_comments': {
+                    '$sum': {
+                        '$map': {
+                            'input': '$stories.chapters',
+                            'as': 'c',
+                            'in': {
+                                '$size': '$$c.comments'
+                            }
+                        }
+                    }
+                },
+                'stories.nb_likes': {
+                    '$size': '$stories.likes'
+                }
+            }
+        }, {
+            '$lookup': {
+                'from': 'users',
+                'localField': 'stories.author',
+                'foreignField': '_id',
+                'as': 'stories.author'
+            }
+        }, {
+            '$unwind': {
+                'path': '$stories.author'
+            }
+        }, {
+            '$limit': 6
+        }, {
+            '$group': {
+                '_id': '$_id',
+                'doc': {
+                    '$first': '$$ROOT'
+                },
+                'stories': {
+                    '$push': '$stories'
+                }
+            }
+        }, {
+            '$addFields': {
+                'doc.stories': '$stories'
+            }
+        }, {
+            '$replaceRoot': {
+                'newRoot': '$doc'
+            }
+        }, {
+            '$unwind': {
+                'path': '$reading_lists',
+                'preserveNullAndEmptyArrays': true
+            }
+        }, {
+            '$lookup': {
+                'from': 'stories',
+                'localField': 'reading_lists.stories',
+                'foreignField': '_id',
+                'as': 'reading_lists.stories'
+            }
+        }, {
+            '$unwind': {
+                'path': '$reading_lists.stories',
+                'preserveNullAndEmptyArrays': true
+            }
+        }, {
+            '$lookup': {
+                'from': 'users',
+                'localField': 'reading_lists.stories.author',
+                'foreignField': '_id',
+                'as': 'reading_lists.stories.author'
+            }
+        }, {
+            '$unwind': {
+                'path': '$reading_lists.stories.author',
+                'preserveNullAndEmptyArrays': true
+            }
+        }, {
+            '$group': {
+                '_id': '$reading_lists._id',
+                'doc': {
+                    '$first': '$$ROOT'
+                },
+                'reading_lists_stories': {
+                    '$push': '$reading_lists.stories'
+                }
+            }
+        }, {
+            '$addFields': {
+                'doc.reading_lists.stories': '$reading_lists_stories'
+            }
+        }, {
+            '$group': {
+                '_id': '$doc._id',
+                'reading_lists': {
+                    '$push': '$doc.reading_lists'
+                },
+                'doc': {
+                    '$first': '$doc'
+                }
+            }
+        }, {
+            '$addFields': {
+                'doc.reading_lists': '$reading_lists'
+            }
+        }, {
+            '$replaceRoot': {
+                'newRoot': '$doc'
+            }
+        }, {
+            '$project': {
+                'username': 1,
+                'username_display': 1,
+                'followers': 1,
+                'following': 1,
+                'nb_stories': 1,
+                'nb_readinglists': {
+                    '$size': {
+                        '$filter': {
+                            'input': '$reading_lists',
+                            'as': 'rl',
+                            'cond': {
+                                '$eq': [
+                                    '$$rl.private', false
+                                ]
+                            }
+                        }
+                    }
+                },
+                'reading_lists.title': 1,
+                'reading_lists.private': 1,
+                'reading_lists.stories.title': 1,
+                'reading_lists.stories._id': 1,
+                'reading_lists.stories.author.username_display': 1,
                 'stories._id': 1,
                 'stories.title': 1,
                 'stories.nb_comments': 1,
@@ -350,7 +582,7 @@ router.get('/me/from/token', function(req, res, next) {
 });
 
 // Add story to reading list
-router.post('/add/readinglist/:id/:idStory', VerifyToken, async function(req, res, next) {
+router.post('/add/readinglist/:id/:idStory', VerifyToken, function(req, res, next) {
 
     const id = req.params.id;
     const idStory = req.params.idStory;
@@ -497,5 +729,24 @@ router.post('/add/readinglist/:id/:idStory', VerifyToken, async function(req, re
 
 });
 
+// Create reading list
+router.post('/new/readinglist/:id/:idStory', VerifyToken, function(req, res, next) {
+    const idStory = req.params.idStory;
+    const id = req.params.id;
+
+    const reading_list = {
+        title: req.body.title,
+        createdAt: new Date(),
+        private: false,
+        stories: [new ObjectId(idStory)]
+    }
+
+
+    User.findOneAndUpdate({_id: new ObjectId(id)}, { $push: { "reading_lists": reading_list } }, {new: true}, function (err, user) {
+        if (err) return err
+        console.log(user)
+    });
+
+});
 
 module.exports = router;
