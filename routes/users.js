@@ -141,6 +141,122 @@ router.get('/:id', (req, res) => {
                 'foreignField': 'author',
                 'as': 'stories'
             }
+        }, {
+            '$addFields': {
+                'nb_stories': {
+                    '$size': '$stories'
+                }
+            }
+        }, {
+            '$unwind': {
+                'path': '$stories',
+                'preserveNullAndEmptyArrays': true
+            }
+        }, {
+            '$lookup': {
+                'from': 'users',
+                'localField': 'stories._id',
+                'foreignField': 'reading_lists.stories',
+                'as': 'faved'
+            }
+        }, {
+            '$addFields': {
+                'stories.nb_favorites': {
+                    '$size': {
+                        '$filter': {
+                            'input': {
+                                '$reduce': {
+                                    'input': {
+                                        '$reduce': {
+                                            'input': '$faved.reading_lists.stories',
+                                            'initialValue': [],
+                                            'in': {
+                                                '$concatArrays': [
+                                                    '$$value', '$$this'
+                                                ]
+                                            }
+                                        }
+                                    },
+                                    'initialValue': [],
+                                    'in': {
+                                        '$concatArrays': [
+                                            '$$value', '$$this'
+                                        ]
+                                    }
+                                }
+                            },
+                            'as': 't',
+                            'cond': {
+                                '$eq': [
+                                    '$$t', '$stories._id'
+                                ]
+                            }
+                        }
+                    }
+                },
+                'stories.nb_comments': {
+                    '$sum': {
+                        '$map': {
+                            'input': '$stories.chapters',
+                            'as': 'c',
+                            'in': {
+                                '$size': '$$c.comments'
+                            }
+                        }
+                    }
+                },
+                'stories.nb_likes': {
+                    '$size': '$stories.likes'
+                }
+            }
+        }, {
+            '$lookup': {
+                'from': 'users',
+                'localField': 'stories.author',
+                'foreignField': '_id',
+                'as': 'stories.author'
+            }
+        }, {
+            '$limit': 6
+        }, {
+            '$group': {
+                '_id': '$_id',
+                'doc': {
+                    '$first': '$$ROOT'
+                },
+                'stories': {
+                    '$push': '$stories'
+                }
+            }
+        }, {
+            '$addFields': {
+                'doc.stories': '$stories'
+            }
+        }, {
+            '$replaceRoot': {
+                'newRoot': '$doc'
+            }
+        }, {
+            '$project': {
+                'username': 1,
+                'username_display': 1,
+                'followers': 1,
+                'following': 1,
+                'nb_stories': 1,
+                'stories._id': 1,
+                'stories.title': 1,
+                'stories.nb_comments': 1,
+                'stories.nb_favorites': 1,
+                'stories.nb_likes': 1,
+                'stories.author.username': 1,
+                'stories.author.username_display': 1,
+                'stories.author._id': 1,
+                'stories.description': 1,
+                'stories.updated_at': 1,
+                'stories.category': 1,
+                'stories.rating': 1,
+                'stories.status': 1
+            }
         }
     ]).exec(function(err, user) {
        if (err) return err
