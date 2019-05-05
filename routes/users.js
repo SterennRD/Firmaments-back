@@ -700,6 +700,58 @@ router.get('/reading-lists/details/:idRL', (req, res) => {
                 'path': '$reading_lists.stories.author'
             }
         }, {
+            '$lookup': {
+                'from': 'users',
+                'localField': 'reading_lists.stories._id',
+                'foreignField': 'reading_lists.stories',
+                'as': 'reading_lists.stories.faved'
+            }
+        }, {
+            '$addFields': {
+                'reading_lists.stories.total_fav': {
+                    '$filter': {
+                        'input': {
+                            '$reduce': {
+                                'input': {
+                                    '$reduce': {
+                                        'input': '$reading_lists.stories.faved.reading_lists.stories',
+                                        'initialValue': [],
+                                        'in': {
+                                            '$concatArrays': [
+                                                '$$value', '$$this'
+                                            ]
+                                        }
+                                    }
+                                },
+                                'initialValue': [],
+                                'in': {
+                                    '$concatArrays': [
+                                        '$$value', '$$this'
+                                    ]
+                                }
+                            }
+                        },
+                        'as': 'fav',
+                        'cond': {
+                            '$eq': [
+                                '$$fav', '$reading_lists.stories._id'
+                            ]
+                        }
+                    }
+                },
+                'reading_lists.stories.nb_comments': {
+                    '$sum': {
+                        '$map': {
+                            'input': '$reading_lists.stories.chapters',
+                            'as': 'c',
+                            'in': {
+                                '$size': '$$c.comments'
+                            }
+                        }
+                    }
+                }
+            }
+        }, {
             '$group': {
                 '_id': '$_id',
                 'reading_lists_stories': {
@@ -723,6 +775,17 @@ router.get('/reading-lists/details/:idRL', (req, res) => {
                         'in': {
                             'title': '$$s.title',
                             '_id': '$$s._id',
+                            'nb_likes': {
+                                '$size': '$$s.likes'
+                            },
+                            'nb_favorites': {
+                                '$size': '$$s.total_fav'
+                            },
+                            'status': '$$s.status',
+                            'rating': '$$s.rating',
+                            'description': '$$s.description',
+                            'category': '$$s.category',
+                            'nb_comments': '$$s.nb_comments',
                             'author': {
                                 '$let': {
                                     'vars': {
