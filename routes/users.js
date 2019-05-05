@@ -547,12 +547,202 @@ router.get('/:id', (req, res) => {
     });
 });
 
+// Get all reading lists
 router.get('/reading-lists/:id', (req, res) => {
     let id = req.params.id;
-    User.findOne({_id: new ObjectId(id)}).select({ "reading_lists": 1, "_id": 0}).exec(function(err, user) {
+    User.aggregate([
+        {
+            '$match': {
+                '_id': new ObjectId(id)
+            }
+        }, {
+            '$unwind': {
+                'path': '$reading_lists'
+            }
+        }, {
+            '$lookup': {
+                'from': 'stories',
+                'localField': 'reading_lists.stories',
+                'foreignField': '_id',
+                'as': 'reading_lists.stories'
+            }
+        }, {
+            '$unwind': {
+                'path': '$reading_lists.stories'
+            }
+        }, {
+            '$lookup': {
+                'from': 'users',
+                'localField': 'reading_lists.stories.author',
+                'foreignField': '_id',
+                'as': 'reading_lists.stories.author'
+            }
+        }, {
+            '$group': {
+                '_id': '$reading_lists._id',
+                'reading_lists_stories': {
+                    '$push': '$reading_lists.stories'
+                },
+                'doc': {
+                    '$first': '$$ROOT'
+                }
+            }
+        }, {
+            '$addFields': {
+                'doc.reading_lists.stories': '$reading_lists_stories'
+            }
+        }, {
+            '$group': {
+                '_id': '$doc._id',
+                'reading_lists': {
+                    '$push': '$doc.reading_lists'
+                },
+                'doc': {
+                    '$first': '$doc'
+                }
+            }
+        }, {
+            '$addFields': {
+                'doc.reading_lists': '$reading_lists'
+            }
+        }, {
+            '$project': {
+                'reading_lists': {
+                    '$map': {
+                        'input': '$doc.reading_lists',
+                        'as': 'rl',
+                        'in': {
+                            '_id': '$$rl._id',
+                            'title': '$$rl.title',
+                            'private': '$$rl.private',
+                            'stories': {
+                                '$map': {
+                                    'input': '$$rl.stories',
+                                    'as': 's',
+                                    'in': {
+                                        'title': '$$s.title',
+                                        '_id': '$$s._id',
+                                        'author': {
+                                            '$let': {
+                                                'vars': {
+                                                    'username_display': '$$s.author.username_display',
+                                                    'id': '$$s.author._id'
+                                                },
+                                                'in': {
+                                                    'username_display': '$$username_display',
+                                                    '_id': '$$id'
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    ]).exec(function(err, user) {
         if (err) return err
         else {
-            res.json(user)
+            res.json(user[0])
+        }
+    });
+});
+
+// Get one reading list
+router.get('/reading-lists/details/:idRL', (req, res) => {
+    let id = req.params.id;
+    let idRL = req.params.idRL;
+    User.aggregate([
+        {
+            '$match': {
+                'reading_lists._id': new ObjectId(idRL)
+            }
+        }, {
+            '$project': {
+                'reading_lists': {
+                    '$filter': {
+                        'input': '$reading_lists',
+                        'as': 'rl',
+                        'cond': {
+                            '$eq': [
+                                '$$rl._id', new ObjectId(idRL)
+                            ]
+                        }
+                    }
+                }
+            }
+        }, {
+            '$unwind': {
+                'path': '$reading_lists'
+            }
+        }, {
+            '$lookup': {
+                'from': 'stories',
+                'localField': 'reading_lists.stories',
+                'foreignField': '_id',
+                'as': 'reading_lists.stories'
+            }
+        }, {
+            '$unwind': {
+                'path': '$reading_lists.stories'
+            }
+        }, {
+            '$lookup': {
+                'from': 'users',
+                'localField': 'reading_lists.stories.author',
+                'foreignField': '_id',
+                'as': 'reading_lists.stories.author'
+            }
+        }, {
+            '$unwind': {
+                'path': '$reading_lists.stories.author'
+            }
+        }, {
+            '$group': {
+                '_id': '$_id',
+                'reading_lists_stories': {
+                    '$push': '$reading_lists.stories'
+                },
+                'doc': {
+                    '$first': '$$ROOT'
+                }
+            }
+        }, {
+            '$project': {
+                'title': '$doc.reading_lists.title',
+                '_id': '$doc.reading_lists._id',
+                'description': '$doc.reading_lists.description',
+                'private': '$doc.reading_lists.private',
+                'stories': {
+                    '$map': {
+                        'input': '$reading_lists_stories',
+                        'as': 's',
+                        'in': {
+                            'title': '$$s.title',
+                            '_id': '$$s._id',
+                            'author': {
+                                '$let': {
+                                    'vars': {
+                                        'username_display': '$$s.author.username_display',
+                                        'id': '$$s.author._id'
+                                    },
+                                    'in': {
+                                        'username_display': '$$username_display',
+                                        '_id': '$$id'
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    ]).exec(function(err, user) {
+        if (err) return err
+        else {
+            res.json(user[0])
         }
     });
 });
