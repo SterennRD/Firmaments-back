@@ -711,6 +711,7 @@ router.get('/reading-lists/details/:idRL', (req, res) => {
             }
         }, {
             '$project': {
+                'owner': '$_id',
                 'title': '$doc.reading_lists.title',
                 '_id': '$doc.reading_lists._id',
                 'description': '$doc.reading_lists.description',
