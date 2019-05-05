@@ -470,11 +470,6 @@ router.get('/:id', (req, res) => {
                         }
                     }
                 },
-                'reading_lists.title': 1,
-                'reading_lists.private': 1,
-                'reading_lists.stories.title': 1,
-                'reading_lists.stories._id': 1,
-                'reading_lists.stories.author.username_display': 1,
                 'stories._id': 1,
                 'stories.title': 1,
                 'stories.nb_comments': 1,
@@ -487,7 +482,61 @@ router.get('/:id', (req, res) => {
                 'stories.updated_at': 1,
                 'stories.category': 1,
                 'stories.rating': 1,
-                'stories.status': 1
+                'stories.status': 1,
+                'reading_lists': {
+                    '$let': {
+                        'vars': {
+                            's': {
+                                '$arrayElemAt': [
+                                    '$reading_lists', 0
+                                ]
+                            }
+                        },
+                        'in': {
+                            '$cond': [
+                                {
+                                    '$eq': [
+                                        '$$s.stories', [
+                                            {}
+                                        ]
+                                    ]
+                                }, '$$REMOVE', {
+                                    '$map': {
+                                        'input': '$reading_lists',
+                                        'as': 'rl',
+                                        'in': {
+                                            'title': '$$rl.title',
+                                            'stories': {
+                                                '$map': {
+                                                    'input': '$$rl.stories',
+                                                    'as': 's',
+                                                    'in': {
+                                                        'title': '$$s.title',
+                                                        '_id': '$$s._id',
+                                                        'author': {
+                                                            '$let': {
+                                                                'vars': {
+                                                                    'u': '$$s.author.username_display',
+                                                                    'id': '$$s.author._id'
+                                                                },
+                                                                'in': {
+                                                                    'username_display': '$$u',
+                                                                    '_id': '$$id'
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            },
+                                            'private': '$$rl.private',
+                                            '_id': '$$rl._id'
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
             }
         }
     ]).exec(function(err, user) {
@@ -744,7 +793,7 @@ router.post('/new/readinglist/:id/:idStory', VerifyToken, function(req, res, nex
 
     User.findOneAndUpdate({_id: new ObjectId(id)}, { $push: { "reading_lists": reading_list } }, {new: true}, function (err, user) {
         if (err) return err
-        console.log(user)
+        res.send(user)
     });
 
 });
