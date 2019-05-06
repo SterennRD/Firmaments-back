@@ -100,6 +100,7 @@ router.post('/login', (req, res, next) => {
                 username: user.username,
                 birth_date: user.birth_date,
                 following: user.following,
+                reading_lists: user.reading_lists,
             };
             const token = jwt.sign({ user : body }, process.env.JWT_SECRET, {
                 expiresIn: 86400 // expires in 24 hours
@@ -425,18 +426,42 @@ router.get('/:id', (req, res) => {
                     '$first': '$$ROOT'
                 },
                 'reading_lists_stories': {
-                    '$push': '$reading_lists.stories'
+                    '$push': {
+                        '$cond': [
+                            {
+                                '$eq': [
+                                    '$reading_lists.stories', {}
+                                ]
+                            }, '$$REMOVE', '$reading_lists.stories'
+                        ]
+                    }
                 }
             }
         }, {
             '$addFields': {
-                'doc.reading_lists.stories': '$reading_lists_stories'
+                'doc.reading_lists.stories': {
+                    '$cond': [
+                        {
+                            '$eq': [
+                                '$reading_lists_stories', []
+                            ]
+                        }, '$$REMOVE', '$reading_lists_stories'
+                    ]
+                }
             }
         }, {
             '$group': {
                 '_id': '$doc._id',
                 'reading_lists': {
-                    '$push': '$doc.reading_lists'
+                    '$push': {
+                        '$cond': [
+                            {
+                                '$eq': [
+                                    '$doc.reading_lists', {}
+                                ]
+                            }, '$$REMOVE', '$doc.reading_lists'
+                        ]
+                    }
                 },
                 'doc': {
                     '$first': '$doc'
@@ -486,21 +511,15 @@ router.get('/:id', (req, res) => {
                 'reading_lists': {
                     '$let': {
                         'vars': {
-                            's': {
-                                '$arrayElemAt': [
-                                    '$reading_lists', 0
-                                ]
-                            }
+                            's': '$reading_lists'
                         },
                         'in': {
                             '$cond': [
                                 {
                                     '$eq': [
-                                        '$$s.stories', [
-                                            {}
-                                        ]
+                                        '$$s', []
                                     ]
-                                }, '$$REMOVE', {
+                                }, [], {
                                     '$map': {
                                         'input': '$reading_lists',
                                         'as': 'rl',
@@ -640,6 +659,10 @@ router.get('/reading-lists/:id', (req, res) => {
                         }
                     }
                 }
+            }
+        }, {
+            '$sort': {
+                'updated_at': 1
             }
         }
     ]).exec(function(err, user) {

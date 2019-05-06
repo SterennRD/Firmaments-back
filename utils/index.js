@@ -33,6 +33,7 @@ function getCleanUser(user) {
         image: u.image,
         following: u.following,
         followers: u.followers,
+        reading_lists: u.reading_lists,
     }
 }
 
