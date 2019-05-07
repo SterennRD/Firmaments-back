@@ -882,7 +882,7 @@ router.get('/reading-lists/details/:idRL', (req, res) => {
 });
 
 // Edit reading list
-router.post('/reading-lists/details/:idRL/edit', (req, res) => {
+router.post('/reading-lists/details/:idRL/edit', VerifyToken, (req, res) => {
     let idRL = req.params.idRL;
     const query = {'reading_lists._id' : new ObjectId(idRL)};
     const data = req.body;
@@ -1650,6 +1650,17 @@ router.post('/new/readinglist/:id/:idStory', VerifyToken, function(req, res, nex
         res.send({readingList: rl[0]})
     });
 
+});
+
+// Delete a reading list
+router.post('/reading-lists/details/:idRL/delete', VerifyToken, async function (req, res, next) {
+    var idRL = req.params.idRL
+    const query = {"reading_lists":{"$elemMatch":{_id: new ObjectId(idRL)}} };
+
+    User.findOneAndUpdate(query,{$pull:{"$.reading_lists":new ObjectId(idRL)}}, {new: true}, async function (err, user) {
+        if (err) throw err
+        res.json(user)
+    });
 });
 
 module.exports = router;

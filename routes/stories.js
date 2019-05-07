@@ -56,6 +56,7 @@ router.get('/all/:page/:perpage', function(req, res) {
     let query = {}
 
     if (pageNumber < 0 || pageNumber == 0 || isNaN(pageNumber)) {
+    if (pageNumber < 0 || pageNumber == 0 || isNaN(pageNumber)) {
         response = { "error": true, "message": "Numéro de page invalide" };
         res.json(response)
     } else {
@@ -184,11 +185,12 @@ router.get('/all/:page/:perpage', function(req, res) {
         ]).exec(function (err, data) {
             // Mongo command to fetch all data from collection.
             if (err) {
-                response = { "error": true, "message": "Error fetching data" };
+                response = {"error": true, "message": "Error fetching data"};
             } else {
                 res.json(data);
             }
         });
+    }
     }
 });
 
