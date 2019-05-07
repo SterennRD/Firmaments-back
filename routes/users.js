@@ -580,7 +580,7 @@ router.get('/reading-lists/:id', (req, res) => {
             }
         }, {
             '$sort': {
-                'reading_lists.created_at': -1
+                'reading_lists.created_at': 1
             }
         }, {
             '$lookup': {
@@ -881,6 +881,208 @@ router.get('/reading-lists/details/:idRL', (req, res) => {
     });
 });
 
+// Edit reading list
+router.post('/reading-lists/details/:idRL/edit', (req, res) => {
+    let idRL = req.params.idRL;
+    const query = {'reading_lists._id' : new ObjectId(idRL)};
+    const data = req.body;
+    const queryRL = [
+        {
+            '$match': {
+                'reading_lists._id': new ObjectId(idRL)
+            }
+        }, {
+            '$project': {
+                'reading_lists': {
+                    '$filter': {
+                        'input': '$reading_lists',
+                        'as': 'rl',
+                        'cond': {
+                            '$eq': [
+                                '$$rl._id', new ObjectId(idRL)
+                            ]
+                        }
+                    }
+                }
+            }
+        }, {
+            '$unwind': {
+                'path': '$reading_lists'
+            }
+        }, {
+            '$lookup': {
+                'from': 'stories',
+                'localField': 'reading_lists.stories',
+                'foreignField': '_id',
+                'as': 'reading_lists.stories'
+            }
+        }, {
+            '$unwind': {
+                'path': '$reading_lists.stories',
+                'preserveNullAndEmptyArrays': true
+            }
+        }, {
+            '$lookup': {
+                'from': 'users',
+                'localField': 'reading_lists.stories.author',
+                'foreignField': '_id',
+                'as': 'reading_lists.stories.author'
+            }
+        }, {
+            '$unwind': {
+                'path': '$reading_lists.stories.author',
+                'preserveNullAndEmptyArrays': true
+            }
+        }, {
+            '$lookup': {
+                'from': 'users',
+                'localField': 'reading_lists.stories._id',
+                'foreignField': 'reading_lists.stories',
+                'as': 'reading_lists.stories.faved'
+            }
+        }, {
+            '$addFields': {
+                'reading_lists.stories.total_fav': {
+                    '$cond': [
+                        {
+                            '$gte': [
+                                '$reading_lists.stories._id', null
+                            ]
+                        }, {
+                            '$filter': {
+                                'input': {
+                                    '$reduce': {
+                                        'input': {
+                                            '$reduce': {
+                                                'input': '$reading_lists.stories.faved.reading_lists.stories',
+                                                'initialValue': [],
+                                                'in': {
+                                                    '$concatArrays': [
+                                                        '$$value', '$$this'
+                                                    ]
+                                                }
+                                            }
+                                        },
+                                        'initialValue': [],
+                                        'in': {
+                                            '$concatArrays': [
+                                                '$$value', '$$this'
+                                            ]
+                                        }
+                                    }
+                                },
+                                'as': 'fav',
+                                'cond': {
+                                    '$eq': [
+                                        '$$fav', '$reading_lists.stories._id'
+                                    ]
+                                }
+                            }
+                        }, '$$REMOVE'
+                    ]
+                },
+                'reading_lists.stories.nb_comments': {
+                    '$cond': [
+                        {
+                            '$gte': [
+                                '$reading_lists.stories._id', null
+                            ]
+                        }, {
+                            '$sum': {
+                                '$map': {
+                                    'input': '$reading_lists.stories.chapters',
+                                    'as': 'c',
+                                    'in': {
+                                        '$size': '$$c.comments'
+                                    }
+                                }
+                            }
+                        }, '$$REMOVE'
+                    ]
+                },
+                'reading_lists.stories.faved': {
+                    '$cond': [
+                        {
+                            '$eq': [
+                                '$reading_lists.stories._id', null
+                            ]
+                        }, '$reading_lists.stories.faved', '$$REMOVE'
+                    ]
+                }
+            }
+        }, {
+            '$group': {
+                '_id': '$_id',
+                'reading_lists_stories': {
+                    '$push': '$reading_lists.stories'
+                },
+                'doc': {
+                    '$first': '$$ROOT'
+                }
+            }
+        }, {
+            '$project': {
+                'owner': '$_id',
+                'title': '$doc.reading_lists.title',
+                '_id': '$doc.reading_lists._id',
+                'description': '$doc.reading_lists.description',
+                'private': '$doc.reading_lists.private',
+                'stories': {
+                    '$cond': [
+                        {
+                            '$ne': [
+                                '$reading_lists_stories', [
+                                    {}
+                                ]
+                            ]
+                        }, {
+                            '$map': {
+                                'input': '$reading_lists_stories',
+                                'as': 's',
+                                'in': {
+                                    'title': '$$s.title',
+                                    '_id': '$$s._id',
+                                    'nb_likes': {
+                                        '$size': '$$s.likes'
+                                    },
+                                    'nb_favorites': {
+                                        '$size': '$$s.total_fav'
+                                    },
+                                    'status': '$$s.status',
+                                    'rating': '$$s.rating',
+                                    'description': '$$s.description',
+                                    'category': '$$s.category',
+                                    'nb_comments': '$$s.nb_comments',
+                                    'author': {
+                                        '$let': {
+                                            'vars': {
+                                                'username_display': '$$s.author.username_display',
+                                                'id': '$$s.author._id'
+                                            },
+                                            'in': {
+                                                'username_display': '$$username_display',
+                                                '_id': '$$id'
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }, []
+                    ]
+                }
+            }
+        }
+    ];
+
+    User.findOneAndUpdate(query, {$set:{"reading_lists.$.title": data.title, "reading_lists.$.description": data.description, "reading_lists.$.private": data.private }}, {new: true}, async function (err, user) {
+        if (err) return err
+        let readingList = await User.aggregate(queryRL).exec();
+        res.json(readingList[0])
+    });
+
+
+});
+
 // Follow or unfollow user
 router.post('/follow/:id/:follow', VerifyToken, function(req, res, next) {
 
@@ -968,10 +1170,7 @@ router.post('/add/readinglist/:id/:idStory', VerifyToken, function(req, res, nex
     const queryStory = [
         {
             '$match': {
-                '_id': new ObjectId(idStory),
-                'status.label': {
-                    '$ne': 'Brouillon'
-                }
+                '_id': new ObjectId(idStory)
             }
         }, {
             '$lookup': {
@@ -1330,7 +1529,7 @@ router.post('/new/readinglist/:id/:idStory', VerifyToken, function(req, res, nex
                 }
             }, {
                 '$sort': {
-                    'reading_lists.created_at': -1
+                    'reading_lists.created_at': 1
                 }
             }, {
                 '$lookup': {

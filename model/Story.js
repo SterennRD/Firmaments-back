@@ -135,11 +135,12 @@ StorySchema.statics.paginate = function(pageNo, callback){
     //get paginated documents
     this.aggregate([
         {
-            '$match' : {
-                "status.label": {"$ne" : "Brouillon"}
+            '$match': {
+                'status.label': {
+                    '$ne': 'Brouillon'
+                }
             }
-        },
-        {
+        }, {
             '$lookup': {
                 'from': 'users',
                 'localField': 'author',
@@ -147,15 +148,58 @@ StorySchema.statics.paginate = function(pageNo, callback){
                 'as': 'author'
             }
         }, {
-            '$unwind': {
-                'path': '$author'
-            }
-        }, {
             '$lookup': {
                 'from': 'users',
                 'localField': '_id',
                 'foreignField': 'reading_lists.stories',
                 'as': 'faved'
+            }
+        }, {
+            '$unwind': {
+                'path': '$author'
+            }
+        }, {
+            '$group': {
+                '_id': '$_id',
+                'total_fav': {
+                    '$push': {
+                        '$reduce': {
+                            'input': {
+                                '$reduce': {
+                                    'input': '$faved.reading_lists.stories',
+                                    'initialValue': [],
+                                    'in': {
+                                        '$concatArrays': [
+                                            '$$value', '$$this'
+                                        ]
+                                    }
+                                }
+                            },
+                            'initialValue': [],
+                            'in': {
+                                '$concatArrays': [
+                                    '$$value', '$$this'
+                                ]
+                            }
+                        }
+                    }
+                },
+                'doc': {
+                    '$first': '$$ROOT'
+                }
+            }
+        }, {
+            '$unwind': {
+                'path': '$total_fav',
+                'preserveNullAndEmptyArrays': true
+            }
+        }, {
+            '$addFields': {
+                'doc.all_faved': '$total_fav'
+            }
+        }, {
+            '$replaceRoot': {
+                'newRoot': '$doc'
             }
         }, {
             '$project': {
@@ -167,8 +211,9 @@ StorySchema.statics.paginate = function(pageNo, callback){
                 'updated_at': 1,
                 'category': 1,
                 'rating': 1,
-                'status': 1,
                 'chapters': 1,
+                'likes': 1,
+                'status': 1,
                 'nb_comments': {
                     '$sum': {
                         '$map': {
@@ -180,11 +225,21 @@ StorySchema.statics.paginate = function(pageNo, callback){
                         }
                     }
                 },
-                'nb_favorites': {
-                    '$size': '$faved'
-                },
                 'nb_likes': {
                     '$size': '$likes'
+                },
+                'nb_favorites': {
+                    '$size': {
+                        '$filter': {
+                            'input': '$all_faved',
+                            'as': 't',
+                            'cond': {
+                                '$eq': [
+                                    '$$t', '$_id'
+                                ]
+                            }
+                        }
+                    }
                 }
             }
         }, {
