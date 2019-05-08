@@ -312,13 +312,27 @@ router.get('/:id', (req, res) => {
         }, {
             '$addFields': {
                 'stories.nb_favorites': {
-                    '$size': {
-                        '$filter': {
-                            'input': {
-                                '$reduce': {
+                    '$cond': [
+                        {
+                            '$ne': [
+                                '$faved', []
+                            ]
+                        }, {
+                            '$size': {
+                                '$filter': {
                                     'input': {
                                         '$reduce': {
-                                            'input': '$faved.reading_lists.stories',
+                                            'input': {
+                                                '$reduce': {
+                                                    'input': '$faved.reading_lists.stories',
+                                                    'initialValue': [],
+                                                    'in': {
+                                                        '$concatArrays': [
+                                                            '$$value', '$$this'
+                                                        ]
+                                                    }
+                                                }
+                                            },
                                             'initialValue': [],
                                             'in': {
                                                 '$concatArrays': [
@@ -327,36 +341,46 @@ router.get('/:id', (req, res) => {
                                             }
                                         }
                                     },
-                                    'initialValue': [],
-                                    'in': {
-                                        '$concatArrays': [
-                                            '$$value', '$$this'
+                                    'as': 't',
+                                    'cond': {
+                                        '$eq': [
+                                            '$$t', '$stories._id'
                                         ]
                                     }
                                 }
-                            },
-                            'as': 't',
-                            'cond': {
-                                '$eq': [
-                                    '$$t', '$stories._id'
-                                ]
                             }
-                        }
-                    }
+                        }, '$$REMOVE'
+                    ]
                 },
                 'stories.nb_comments': {
-                    '$sum': {
-                        '$map': {
-                            'input': '$stories.chapters',
-                            'as': 'c',
-                            'in': {
-                                '$size': '$$c.comments'
+                    '$cond': [
+                        {
+                            '$gte': [
+                                '$stories', {}
+                            ]
+                        }, {
+                            '$sum': {
+                                '$map': {
+                                    'input': '$stories.chapters',
+                                    'as': 'c',
+                                    'in': {
+                                        '$size': '$$c.comments'
+                                    }
+                                }
                             }
-                        }
-                    }
+                        }, '$$REMOVE'
+                    ]
                 },
                 'stories.nb_likes': {
-                    '$size': '$stories.likes'
+                    '$cond': [
+                        {
+                            '$gte': [
+                                '$stories', null
+                            ]
+                        }, {
+                            '$size': '$stories.likes'
+                        }, '$$REMOVE'
+                    ]
                 }
             }
         }, {
@@ -368,7 +392,8 @@ router.get('/:id', (req, res) => {
             }
         }, {
             '$unwind': {
-                'path': '$stories.author'
+                'path': '$stories.author',
+                'preserveNullAndEmptyArrays': true
             }
         }, {
             '$limit': 6
@@ -379,7 +404,15 @@ router.get('/:id', (req, res) => {
                     '$first': '$$ROOT'
                 },
                 'stories': {
-                    '$push': '$stories'
+                    '$push': {
+                        '$cond': [
+                            {
+                                '$ne': [
+                                    '$stories', {}
+                                ]
+                            }, '$stories', '$$REMOVE'
+                        ]
+                    }
                 }
             }
         }, {
@@ -429,10 +462,10 @@ router.get('/:id', (req, res) => {
                     '$push': {
                         '$cond': [
                             {
-                                '$eq': [
-                                    '$reading_lists.stories', {}
+                                '$ne': [
+                                    '$reading_lists.stories', null
                                 ]
-                            }, '$$REMOVE', '$reading_lists.stories'
+                            }, '$reading_lists.stories', '$$REMOVE'
                         ]
                     }
                 }
@@ -442,10 +475,12 @@ router.get('/:id', (req, res) => {
                 'doc.reading_lists.stories': {
                     '$cond': [
                         {
-                            '$eq': [
-                                '$reading_lists_stories', []
+                            '$ne': [
+                                '$reading_lists_stories', [
+                                    {}
+                                ]
                             ]
-                        }, '$$REMOVE', '$reading_lists_stories'
+                        }, '$reading_lists_stories', '$$REMOVE'
                     ]
                 }
             }
@@ -456,10 +491,10 @@ router.get('/:id', (req, res) => {
                     '$push': {
                         '$cond': [
                             {
-                                '$eq': [
+                                '$ne': [
                                     '$doc.reading_lists', {}
                                 ]
-                            }, '$$REMOVE', '$doc.reading_lists'
+                            }, '$doc.reading_lists', '$$REMOVE'
                         ]
                     }
                 },
@@ -509,50 +544,35 @@ router.get('/:id', (req, res) => {
                 'stories.rating': 1,
                 'stories.status': 1,
                 'reading_lists': {
-                    '$let': {
-                        'vars': {
-                            's': '$reading_lists'
-                        },
+                    '$map': {
+                        'input': '$reading_lists',
+                        'as': 'rl',
                         'in': {
-                            '$cond': [
-                                {
-                                    '$eq': [
-                                        '$$s', []
-                                    ]
-                                }, [], {
-                                    '$map': {
-                                        'input': '$reading_lists',
-                                        'as': 'rl',
-                                        'in': {
-                                            'title': '$$rl.title',
-                                            'stories': {
-                                                '$map': {
-                                                    'input': '$$rl.stories',
-                                                    'as': 's',
-                                                    'in': {
-                                                        'title': '$$s.title',
-                                                        '_id': '$$s._id',
-                                                        'author': {
-                                                            '$let': {
-                                                                'vars': {
-                                                                    'u': '$$s.author.username_display',
-                                                                    'id': '$$s.author._id'
-                                                                },
-                                                                'in': {
-                                                                    'username_display': '$$u',
-                                                                    '_id': '$$id'
-                                                                }
-                                                            }
-                                                        }
-                                                    }
+                            '_id': '$$rl._id',
+                            'title': '$$rl.title',
+                            'private': '$$rl.private',
+                            'stories': {
+                                '$map': {
+                                    'input': '$$rl.stories',
+                                    'as': 's',
+                                    'in': {
+                                        'title': '$$s.title',
+                                        '_id': '$$s._id',
+                                        'author': {
+                                            '$let': {
+                                                'vars': {
+                                                    'a': '$$s.author'
+                                                },
+                                                'in': {
+                                                    'username_display': '$$a.username_display',
+                                                    'username': '$$a.username',
+                                                    '_id': '$$a._id'
                                                 }
-                                            },
-                                            'private': '$$rl.private',
-                                            '_id': '$$rl._id'
+                                            }
                                         }
                                     }
                                 }
-                            ]
+                            }
                         }
                     }
                 }
