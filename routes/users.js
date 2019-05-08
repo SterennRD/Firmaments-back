@@ -1657,7 +1657,7 @@ router.post('/reading-lists/details/:idRL/delete', VerifyToken, async function (
     var idRL = req.params.idRL
     const query = {"reading_lists":{"$elemMatch":{_id: new ObjectId(idRL)}} };
 
-    User.findOneAndUpdate(query,{$pull:{"$.reading_lists":new ObjectId(idRL)}}, {new: true}, async function (err, user) {
+    User.findOneAndUpdate(query,{$pull:{"reading_lists":{"_id":new ObjectId(idRL)}}}, {new: true}, async function (err, user) {
         if (err) throw err
         res.json(user)
     });
