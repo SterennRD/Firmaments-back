@@ -418,6 +418,8 @@ router.get('/:id', async function (req, res) {
                 'likes': 1,
                 'status': 1,
                 'cover': 1,
+                'annotation_authorized': 1,
+                'comment_authorized': 1,
                 'nb_comments': {
                     '$sum': {
                         '$map': {
@@ -732,7 +734,109 @@ router.get('/:id/chapter/:idChapter', async function (req, res) {
     let id = req.params.id;
     let idChapter = req.params.idChapter;
 
-    let histoire = await Story.findById(id).lean().exec();
+    const query = [
+        {
+            '$match': {
+                '_id': new ObjectId(id)
+            }
+        }, {
+            '$addFields': {
+                'selectedChapter': {
+                    '$filter': {
+                        'input': '$chapters',
+                        'as': 'c',
+                        'cond': {
+                            '$eq': [
+                                '$$c._id', new ObjectId(idChapter)
+                            ]
+                        }
+                    }
+                }
+            }
+        }, {
+            '$unwind': {
+                'path': '$selectedChapter'
+            }
+        }, {
+            '$unwind': {
+                'path': '$selectedChapter.comments',
+                'preserveNullAndEmptyArrays': true
+            }
+        }, {
+            '$lookup': {
+                'from': 'users',
+                'localField': 'selectedChapter.comments.author',
+                'foreignField': '_id',
+                'as': 'selectedChapter.comments.author'
+            }
+        }, {
+            '$unwind': {
+                'path': '$selectedChapter.comments.author',
+                'preserveNullAndEmptyArrays': true
+            }
+        }, {
+            '$group': {
+                '_id': '$_id',
+                'selectedChapter_comments': {
+                    '$push': '$selectedChapter.comments'
+                },
+                'doc': {
+                    '$first': '$$ROOT'
+                }
+            }
+        }, {
+            '$addFields': {
+                'doc.selectedChapter.comments': '$selectedChapter_comments'
+            }
+        }, {
+            '$replaceRoot': {
+                'newRoot': '$doc'
+            }
+        }, {
+            '$project': {
+                'story': '$$ROOT',
+                'selectedChapter': '$selectedChapter'
+            }
+        }, {
+            '$addFields': {
+                'selectedChapter.comments': {
+                    '$map': {
+                        'input': '$selectedChapter.comments',
+                        'as': 's',
+                        'in': {
+                            '_id': '$$s._id',
+                            'content': '$$s.content',
+                            'author': {
+                                '$let': {
+                                    'vars': {
+                                        'a': '$$s.author'
+                                    },
+                                    'in': {
+                                        'username': '$$a.username',
+                                        '_id': '$$a._id',
+                                        'username_display': '$$a.username_display'
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                'story.selectedChapter': '$$REMOVE'
+            }
+        }
+    ];
+
+    Story.aggregate(query).exec(function(err, story){
+        if (err)
+            return err
+        else {
+            let selectedchapter = story[0].selectedChapter
+            let selectedstory = story[0].story
+            res.json({story: selectedstory, selectedChapter: selectedchapter});
+        }
+    });
+
+    /*let histoire = await Story.findById(id).lean().exec();
 
     Story.findById(id, function (err, story){
         if(err) {
@@ -743,7 +847,7 @@ router.get('/:id/chapter/:idChapter', async function (req, res) {
             let response = {...histoire, selectedChapter:chapter}
             res.json(response)
         }
-    });
+    });*/
 });
 
 // Edit chapter from id
