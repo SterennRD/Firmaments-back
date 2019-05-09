@@ -669,7 +669,7 @@ router.get('/last/posted', async function (req, res) {
             '$limit': 10
         }, {
             '$sort': {
-                'updated_at': 1
+                'updated_at': -1
             }
         }
     ]).exec(function(err, stories){
@@ -1014,7 +1014,6 @@ router.post('/chapter/:idChapter/add-comment', async function (req, res) {
 // Post a chapter
 router.post('/:id/new/chapter', VerifyToken, function(req, res, next) {
     const id = req.params.id;
-    console.log(req.body)
     Story.findByIdAndUpdate(
         id,
         { $push: { chapters: req.body } },

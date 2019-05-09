@@ -89,6 +89,7 @@ const StorySchema = new Schema({
     },
     category: [{
         id: Number,
+        value: Number,
         label: String
     }],
     status: {

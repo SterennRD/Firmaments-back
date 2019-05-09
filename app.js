@@ -26,14 +26,37 @@ http.listen(4001, function(){
 });
 
 const Notification = require('./model/Notification');
+const User = require('./model/User');
 const Story = require('./model/Story');
+
+const socketUsers = [];
+
+
 io.on('connection', function(socket){
     console.log('a user connected');
-    socket.on('message', async function (data) {
+    socket.on('currentUser', function(user) {
+        socketUsers.push({
+            socketId: socket.id,
+            user: user
+        });
+        console.log(socketUsers)
+    });
+    socket.on('message', async function (data, to) {
         console.log(data);
+        console.log(to);
         let story = await Story.findOne({'chapters._id' : data.chapter_id}).exec();
-        data = {...data, story_id: story._id};
-        console.log(data)
+        let user = await User.findOne({'_id' : story.author}).lean();
+        let userSocketId = socketUsers.find(u => u.user._id == user._id).socketId;
+        if (user.followers.length > 0) {
+            console.log("j'ai des followers")
+        } else {
+            console.log("pas de followers")
+        }
+        data = {...data, story_id: story._id, user_to: user.followers};
+        //console.log(data)
+        //io.sockets.emit('essai', data);
+        console.log(userSocketId);
+        io.to(`${userSocketId}`).emit('essai', data)
         const notif = new Notification(data);
         //notif.save();
     });
