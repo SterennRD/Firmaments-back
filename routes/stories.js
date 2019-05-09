@@ -22,6 +22,22 @@ var storage = multer.diskStorage({
 var upload = multer({storage: storage});
 //var upload = multer({ dest: 'uploads/' });
 
+/// ALL ROUTES
+// Get all stories -- '/'
+// Get all stories -- '/all/:page'
+// Get story from user --  '/user/:id'
+// Get story from id -- '/:id'
+// Get last stories -- '/last/posted
+// Post a story -- '/' (post)
+// Edit a story -- '/edit/:id' (post)
+// Add like -- '/like/:id' (post)
+// Get chapter from id -- '/:id/chapter/:idChapter'
+// Edit chapter from id -- '/:id/chapter/:idChapter/edit' (post)
+// Add comment -- '/chapter/:idChapter/add-comment' (post)
+// Post a chapter -- '/:id/new/chapter' (post)
+// Delete a story -- '/:id' (delete)
+// Search story -- '/search/story'
+
 // Get all stories
 router.get('/', function(req, res) {
     Story.find({}).sort('-created_at').populate('author').exec(function(err, stories){
@@ -46,6 +62,7 @@ router.get('/all/:page', (req, res) => {
         return res.status(200).json(response);
     });
 });
+
 // Get all stories
 router.get('/all/:page/:perpage', function(req, res) {
     console.log('page number : ' + req.params.page);
@@ -737,7 +754,7 @@ router.get('/:id/chapter/:idChapter', async function (req, res) {
     const query = [
         {
             '$match': {
-                '_id': new ObjectId(id)
+                'chapters._id': new ObjectId(idChapter)
             }
         }, {
             '$addFields': {
@@ -775,10 +792,22 @@ router.get('/:id/chapter/:idChapter', async function (req, res) {
                 'preserveNullAndEmptyArrays': true
             }
         }, {
+            '$sort': {
+                'selectedChapter.comments.created_at': -1
+            }
+        }, {
             '$group': {
                 '_id': '$_id',
                 'selectedChapter_comments': {
-                    '$push': '$selectedChapter.comments'
+                    '$push': {
+                        '$cond': [
+                            {
+                                '$ne': [
+                                    '$selectedChapter.comments', {}
+                                ]
+                            }, '$selectedChapter.comments', '$$REMOVE'
+                        ]
+                    }
                 },
                 'doc': {
                     '$first': '$$ROOT'
@@ -806,6 +835,7 @@ router.get('/:id/chapter/:idChapter', async function (req, res) {
                         'in': {
                             '_id': '$$s._id',
                             'content': '$$s.content',
+                            'created_at': '$$s.created_at',
                             'author': {
                                 '$let': {
                                     'vars': {
@@ -835,19 +865,6 @@ router.get('/:id/chapter/:idChapter', async function (req, res) {
             res.json({story: selectedstory, selectedChapter: selectedchapter});
         }
     });
-
-    /*let histoire = await Story.findById(id).lean().exec();
-
-    Story.findById(id, function (err, story){
-        if(err) {
-            console.log(err)
-            throw err
-        } else {
-            let chapter = story.chapters.id(idChapter);
-            let response = {...histoire, selectedChapter:chapter}
-            res.json(response)
-        }
-    });*/
 });
 
 // Edit chapter from id
@@ -873,6 +890,128 @@ router.post('/:id/chapter/:idChapter/edit', async function (req, res) {
         }
     );
 });
+
+// Add comment
+router.post('/chapter/:idChapter/add-comment', async function (req, res) {
+    let idChapter = req.params.idChapter;
+
+    const comment = {...req.body, author: new ObjectId(req.body.author), created_at: new Date()}
+    const query = [
+        {
+            '$match': {
+                'chapters._id': new ObjectId(idChapter)
+            }
+        }, {
+            '$addFields': {
+                'selectedChapter': {
+                    '$filter': {
+                        'input': '$chapters',
+                        'as': 'c',
+                        'cond': {
+                            '$eq': [
+                                '$$c._id', new ObjectId(idChapter)
+                            ]
+                        }
+                    }
+                }
+            }
+        }, {
+            '$unwind': {
+                'path': '$selectedChapter'
+            }
+        }, {
+            '$unwind': {
+                'path': '$selectedChapter.comments',
+                'preserveNullAndEmptyArrays': true
+            }
+        }, {
+            '$lookup': {
+                'from': 'users',
+                'localField': 'selectedChapter.comments.author',
+                'foreignField': '_id',
+                'as': 'selectedChapter.comments.author'
+            }
+        }, {
+            '$unwind': {
+                'path': '$selectedChapter.comments.author',
+                'preserveNullAndEmptyArrays': true
+            }
+        }, {
+            '$sort': {
+                'selectedChapter.comments.created_at': -1
+            }
+        }, {
+            '$group': {
+                '_id': '$_id',
+                'selectedChapter_comments': {
+                    '$push': {
+                        '$cond': [
+                            {
+                                '$ne': [
+                                    '$selectedChapter.comments', {}
+                                ]
+                            }, '$selectedChapter.comments', '$$REMOVE'
+                        ]
+                    }
+                },
+                'doc': {
+                    '$first': '$selectedChapter'
+                }
+            }
+        }, {
+            '$addFields': {
+                'doc.comments': '$selectedChapter_comments'
+            }
+        }, {
+            '$replaceRoot': {
+                'newRoot': '$doc'
+            }
+        }, {
+            '$addFields': {
+                'comments': {
+                    '$map': {
+                        'input': '$comments',
+                        'as': 's',
+                        'in': {
+                            '_id': '$$s._id',
+                            'content': '$$s.content',
+                            'created_at': '$$s.created_at',
+                            'author': {
+                                '$let': {
+                                    'vars': {
+                                        'a': '$$s.author'
+                                    },
+                                    'in': {
+                                        'username': '$$a.username',
+                                        '_id': '$$a._id',
+                                        'username_display': '$$a.username_display'
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    ];
+    Story.findOneAndUpdate(
+        { "chapters._id": new ObjectId(idChapter) },
+        {
+            "$push": {
+                "chapters.$.comments": comment
+            }
+        }, {new: true},
+        async function(err, story) {
+            if(err) {
+                throw err
+            } else {
+                let selectedChapter = await Story.aggregate(query);
+                res.json(selectedChapter[0])
+            }
+        }
+    );
+});
+
 // Post a chapter
 router.post('/:id/new/chapter', VerifyToken, function(req, res, next) {
     const id = req.params.id;
