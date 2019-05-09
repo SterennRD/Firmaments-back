@@ -6,10 +6,18 @@ const NotificationSchema = new Schema({
         type: Schema.Types.ObjectId,
         ref: 'User'
     }],
-    user_from: [{
+    user_from: {
         type: Schema.Types.ObjectId,
         ref: 'User'
-    }],
+    },
+    story_id: {
+        type: Schema.Types.ObjectId,
+        ref: 'Story'
+    },
+    chapter_id: {
+        type: Schema.Types.ObjectId,
+        ref: 'Chapter'
+    },
     message: String,
     seen: {
         type: Boolean,

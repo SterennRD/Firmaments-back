@@ -26,12 +26,16 @@ http.listen(4001, function(){
 });
 
 const Notification = require('./model/Notification');
+const Story = require('./model/Story');
 io.on('connection', function(socket){
     console.log('a user connected');
-    socket.on('message', function (data) {
+    socket.on('message', async function (data) {
         console.log(data);
+        let story = await Story.findOne({'chapters._id' : data.chapter_id}).exec();
+        data = {...data, story_id: story._id};
+        console.log(data)
         const notif = new Notification(data);
-        notif.save();
+        //notif.save();
     });
 });
 

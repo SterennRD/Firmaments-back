@@ -62,6 +62,8 @@ const chapterSchema = new Schema({
         ref: 'User'
     }]
 });
+const ChapterModel = mongoose.model('Chapter', chapterSchema);
+module.exports = ChapterModel;
 
 const StorySchema = new Schema({
     author: {
@@ -279,3 +281,4 @@ const StoryModel = mongoose.model('Story', StorySchema);
 
 
 module.exports = StoryModel;
+
