@@ -54,7 +54,10 @@ io.on('connection', function(socket){
         let userSocketId = socketUsers.find(u => u.user._id == user._id).socketId;
         data = {
             ...data,
-            story_id: story._id,
+            story_id: {
+                '_id': story._id,
+                'title': story.title
+            },
             user_to: user._id,
             user_from: {
                 '_id': user_from._id,

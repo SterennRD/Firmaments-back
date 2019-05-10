@@ -15,8 +15,11 @@ const NotificationSchema = new Schema({
         username_display: String
     },
     story_id: {
-        type: Schema.Types.ObjectId,
-        ref: 'Story'
+        _id:{
+            type: Schema.Types.ObjectId,
+            ref: 'Story'
+        },
+        title: String
     },
     chapter_id: {
         type: Schema.Types.ObjectId,

@@ -1111,6 +1111,173 @@ router.get('/search/story', async function (req, res) {
     });*/
 });
 
+// Search
+router.get('/search/story/all/:page/:perpage', function(req, res) {
+    const searchWords = req.query.search;
+    var regex = new RegExp(req.query.search, 'i');
+console.log(regex)
+    console.log('page number : ' + req.params.page);
+    console.log('per page : ' + req.params.perpage);
+
+    let pageNumber = req.params.page ; // parseInt(req.query.pageNo)
+    let size = req.params.perpage;
+    let query = {}
+    let totalCount;
+    Story.countDocuments({title: regex}, function(err, count) {
+        console.log(count)
+        if (err){
+            totalCount = 0;
+        }
+        else{
+            totalCount = count;
+        }
+    });
+
+    if (pageNumber < 0 || pageNumber == 0 || isNaN(pageNumber)) {
+        response = { "error": true, "message": "Numéro de page invalide" };
+        res.json(response)
+    } else {
+
+        query.skip = size * (pageNumber - 1)
+        query.limit = parseInt(size)
+        // Find some documents
+        Story.aggregate([
+            {
+                '$match': {
+                    'status.label': {
+                        '$ne': 'Brouillon'
+                    },
+                    'title': {
+                        "$regex": req.query.search
+                    }
+                }
+            }, {
+                '$lookup': {
+                    'from': 'users',
+                    'localField': 'author',
+                    'foreignField': '_id',
+                    'as': 'author'
+                }
+            }, {
+                '$lookup': {
+                    'from': 'users',
+                    'localField': '_id',
+                    'foreignField': 'reading_lists.stories',
+                    'as': 'faved'
+                }
+            }, {
+                '$unwind': {
+                    'path': '$author'
+                }
+            }, {
+                '$group': {
+                    '_id': '$_id',
+                    'total_fav': {
+                        '$push': {
+                            '$reduce': {
+                                'input': {
+                                    '$reduce': {
+                                        'input': '$faved.reading_lists.stories',
+                                        'initialValue': [],
+                                        'in': {
+                                            '$concatArrays': [
+                                                '$$value', '$$this'
+                                            ]
+                                        }
+                                    }
+                                },
+                                'initialValue': [],
+                                'in': {
+                                    '$concatArrays': [
+                                        '$$value', '$$this'
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    'doc': {
+                        '$first': '$$ROOT'
+                    }
+                }
+            }, {
+                '$unwind': {
+                    'path': '$total_fav',
+                    'preserveNullAndEmptyArrays': true
+                }
+            }, {
+                '$addFields': {
+                    'doc.all_faved': '$total_fav'
+                }
+            }, {
+                '$replaceRoot': {
+                    'newRoot': '$doc'
+                }
+            }, {
+                '$project': {
+                    'title': 1,
+                    'author.username': 1,
+                    'author.username_display': 1,
+                    'author._id': 1,
+                    'description': 1,
+                    'updated_at': 1,
+                    'category': 1,
+                    'rating': 1,
+                    'chapters': 1,
+                    'likes': 1,
+                    'status': 1,
+                    'nb_comments': {
+                        '$sum': {
+                            '$map': {
+                                'input': '$chapters',
+                                'as': 'c',
+                                'in': {
+                                    '$size': '$$c.comments'
+                                }
+                            }
+                        }
+                    },
+                    'nb_likes': {
+                        '$size': '$likes'
+                    },
+                    'nb_favorites': {
+                        '$size': {
+                            '$filter': {
+                                'input': '$all_faved',
+                                'as': 't',
+                                'cond': {
+                                    '$eq': [
+                                        '$$t', '$_id'
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                }
+            }, {
+                '$skip': query.skip
+            }, {
+                '$limit': query.limit
+            }, {
+                '$sort': {
+                    'created_at': 1
+                }
+            }
+        ]).exec(function (err, data) {
+            // Mongo command to fetch all data from collection.
+            if (err) {
+                response = {"error": true, "message": "Error fetching data"};
+            } else {
+                var result = {
+                    "totalResults" : totalCount,
+                    "result": data,
+                };
+                res.json(result);
+            }
+        });
+    }
+
+});
+
 
 
 module.exports = router;
