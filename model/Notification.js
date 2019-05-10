@@ -7,8 +7,12 @@ const NotificationSchema = new Schema({
         ref: 'User'
     }],
     user_from: {
-        type: Schema.Types.ObjectId,
-        ref: 'User'
+        _id: {
+            type: Schema.Types.ObjectId,
+            ref: 'User'
+        },
+        username: String,
+        username_display: String
     },
     story_id: {
         type: Schema.Types.ObjectId,

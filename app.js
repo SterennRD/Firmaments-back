@@ -35,11 +35,36 @@ const socketUsers = [];
 io.on('connection', function(socket){
     console.log('a user connected');
     socket.on('currentUser', function(user) {
+        if (socketUsers.length > 0) {
+            socketUsers.splice(socketUsers.findIndex(function(i){
+                return i.user._id === user._id;
+            }), 1);
+        }
+
         socketUsers.push({
             socketId: socket.id,
             user: user
         });
         console.log(socketUsers)
+    });
+    socket.on('newComment', async function (data) {
+        let story = await Story.findOne({'chapters._id' : data.chapter_id}).exec();
+        let user = await User.findOne({'_id' : story.author}).lean();
+        let user_from = await User.findOne({'_id' : data.user_from}).lean();
+        let userSocketId = socketUsers.find(u => u.user._id == user._id).socketId;
+        data = {
+            ...data,
+            story_id: story._id,
+            user_to: user._id,
+            user_from: {
+                '_id': user_from._id,
+                'username': user_from.username,
+                'username_display': user_from.username_display
+            }
+        };
+        const notif = new Notification(data);
+        notif.save();
+        io.to(`${userSocketId}`).emit('receiveComment', notif)
     });
     socket.on('message', async function (data, to) {
         console.log(data);
@@ -53,9 +78,9 @@ io.on('connection', function(socket){
             console.log("pas de followers")
         }
         data = {...data, story_id: story._id, user_to: user.followers};
-        //console.log(data)
-        //io.sockets.emit('essai', data);
+
         console.log(userSocketId);
+        console.log(socketUsers);
         io.to(`${userSocketId}`).emit('essai', data)
         const notif = new Notification(data);
         //notif.save();
