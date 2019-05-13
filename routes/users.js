@@ -8,6 +8,8 @@ const LocalStrategy = require('passport-local').Strategy;
 const ExtractJwt = require('passport-jwt').ExtractJwt;
 const validateRegisterInput = require('../validation/register');
 const validateLoginInput = require('../validation/login');
+const validateEditInput = require('../validation/edit');
+const validateChangePassword = require('../validation/change-password');
 var utils = require('../utils/index');
 var VerifyToken = require('../auth/VerifyToken');
 const tokenList = {}
@@ -118,6 +120,115 @@ router.post('/login', (req, res, next) => {
             return res.json(response);*/
         });
     })(req, res, next);
+});
+
+// Edit parameters
+router.post('/edit', VerifyToken, async function(req, res) {
+    //console.log("editer user", req.body)
+    const { errors, isValid } = validateEditInput(req.body);
+
+    if(!isValid) {
+        return res.status(400).json(errors);
+    }
+
+    const body = {
+        username: req.body.username,
+        email: req.body.email
+    }
+    /*User.findOneAndUpdate(req.body._id,{$set: req.body}, { runValidators: true, context: 'query', new: true} , function (err, story) {
+        if (err) {
+            console.log(err)
+        }
+        return res.json(story);
+    })*/
+    let error;
+    let username = await User.findOne({_id: {$ne: new ObjectId(req.body._id)},username: req.body.username});
+    if (username) {
+        error = {...error, username: 'Nom d\'utilisateur déjà pris'}
+    }
+    let email = await User.findOne({_id: {$ne: new ObjectId(req.body._id)},email: req.body.email});
+    if (email) {
+        error = {...error, email: 'Adresse mail déjà utilisée éé'}
+    }
+    if (error && error !== {}) {
+        console.log("les erreurs", error)
+        return res.status(400).json(error);
+    }
+
+
+    User.findOneAndUpdate(req.body._id,{$set: body}, {new: true} , function (err, user) {
+        if (err) {
+            console.log(err)
+            return err
+        }
+        return res.json(user);
+    })
+
+    /*User.findOne().or([{ email: req.body.email }, { username: req.body.username }]).then(user => {
+        if(user) {
+            if (user.email !== req.body.email && user.username == req.body.username) {
+                return res.status(400).json({
+                    username: 'Nom d\'utilisateur déjà pris'
+                });
+            } else if (user.email == req.body.email && user.username !== req.body.username) {
+                return res.status(400).json({
+                    email: 'Adresse mail déjà utilisée'
+                });
+            } else if (user.email == req.body.email && user.username == req.body.username) {
+                return res.status(400).json({
+                    username: 'Nom d\'utilisateur déjà pris',
+                    email: 'Adresse mail déjà utilisée'
+                });
+            }
+        }
+        else {
+
+            /*bcrypt.genSalt(10, (err, salt) => {
+                if(err) console.error('There was an error', err);
+                else {
+                    bcrypt.hash(newUser.password, salt, (err, hash) => {
+                        if(err) console.error('There was an error', err);
+                        else {
+                            newUser.password = hash;
+                            newUser
+                                .save()
+                                .then(user => {
+                                    res.json(user)
+                                });
+                        }
+                    });
+                }
+            });
+        }
+    });*/
+});
+
+// Change password
+router.post('/editpassword', VerifyToken, async function(req, res) {
+    //console.log("editer user", req.body)
+    const { errors, isValid } = validateChangePassword(req.body);
+
+    if(!isValid) {
+        return res.status(400).json(errors);
+    }
+
+    const body = {
+        username: req.body.username,
+        email: req.body.email
+    }
+
+    let error;
+
+    User.findById(req.body._id).exec(function (err, user) {
+        if (user) {
+            user.comparePassword(req.body.password, function(err, isMatch) {
+                if (err) throw err;
+                if (!isMatch) {
+                    error = {...error, password: 'Mot de passe invalide'}
+                }
+            });
+        }
+    })
 });
 
 router.get('/me', passport.authenticate('jwt', { session: false }), (req, res) => {
