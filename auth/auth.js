@@ -28,13 +28,17 @@ passport.use('login', new LocalStrategy({
     usernameField: 'email',
     passwordField: 'password'
 }, (email, password, done) => {
-    UserModel.findOne({ email }, (err, user) => {
+    console.log(email)
+    var criteria = email.indexOf('@') === -1 ? {username: email} : {email: email};
+    console.log(criteria)
+    UserModel.findOne(criteria, (err, user) => {
         if(!user){
-            return done(null, false, { message : 'User not found'});
+            console.log("user pas trouvé")
+            return done(null, false, { message : 'Nom d\'utilisateur ou email introuvable'});
         }
         user.isValidPassword(password, isValid => {
             if(!isValid){
-                return done(null, false, { message : 'Wrong Password'});
+                return done(null, false, { message : 'Mot de passe invalide'});
             }
             return done(null, user, { message : 'Logged in Successfully'});
         });

@@ -78,6 +78,7 @@ router.get('/all/:page/:perpage', function(req, res) {
     } else {
 
         query.skip = size * (pageNumber - 1)
+        console.log("skip", query.skip)
         query.limit = parseInt(size)
         // Find some documents
         Story.aggregate([
@@ -637,6 +638,7 @@ router.get('/last/posted', async function (req, res) {
                 'chapters': 1,
                 'likes': 1,
                 'status': 1,
+                'cover': 1,
                 'nb_comments': {
                     '$sum': {
                         '$map': {
@@ -1115,7 +1117,7 @@ router.get('/search/story', async function (req, res) {
 router.get('/search/story/all/:page/:perpage', function(req, res) {
     const searchWords = req.query.search;
     var regex = new RegExp(req.query.search, 'i');
-console.log(regex)
+    console.log(regex)
     console.log('page number : ' + req.params.page);
     console.log('per page : ' + req.params.perpage);
 
@@ -1123,7 +1125,7 @@ console.log(regex)
     let size = req.params.perpage;
     let query = {}
     let totalCount;
-    Story.countDocuments({title: regex}, function(err, count) {
+    Story.countDocuments({title: regex, 'status.label': {'$ne': 'Brouillon'}}, function(err, count) {
         console.log(count)
         if (err){
             totalCount = 0;
@@ -1222,7 +1224,15 @@ console.log(regex)
                     'updated_at': 1,
                     'category': 1,
                     'rating': 1,
-                    'chapters': 1,
+                    'chapters': {
+                        '$map': {
+                            'input': '$chapters',
+                            'as': 'c',
+                            'in': {
+                                'title': '$$c.title'
+                            }
+                        }
+                    },
                     'likes': 1,
                     'status': 1,
                     'nb_comments': {
@@ -1269,7 +1279,12 @@ console.log(regex)
             } else {
                 var result = {
                     "totalResults" : totalCount,
-                    "result": data,
+                    "resultsPerPage": req.params.perpage,
+                    "result": {
+                        "stories": data
+                    },
+                    "searchText": req.query.search,
+                    "page": req.params.page
                 };
                 res.json(result);
             }
