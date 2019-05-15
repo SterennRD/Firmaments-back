@@ -15,6 +15,7 @@ var multer = require('multer');
 var indexRouter = require('./routes/index');
 var usersRouter = require('./routes/users');
 var storiesRouter = require('./routes/stories');
+var notifsRouter = require('./routes/notifications');
 
 var app = express();
 
@@ -139,6 +140,7 @@ app.use(express.static(__dirname + '/public'));
 app.use('/', indexRouter);
 app.use('/users', usersRouter);
 app.use('/stories', storiesRouter);
+app.use('/notifications', notifsRouter);
 
 function validateUser(req, res, next) {
     var token = req.headers['authorization'];

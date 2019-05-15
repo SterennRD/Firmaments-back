@@ -23,7 +23,7 @@ passport.use('signup', new LocalStrategy({
         password: password,
         birth_date: req.body.birth_date }, (err, user) => done(err, user));
 }));
-
+/*
 passport.use('login', new LocalStrategy({
     usernameField: 'email',
     passwordField: 'password'
@@ -43,7 +43,7 @@ passport.use('login', new LocalStrategy({
             return done(null, user, { message : 'Logged in Successfully'});
         });
     });
-}));
+}));*/
 passport.use('login', new LocalStrategy({
     usernameField: 'email',
     passwordField: 'password'

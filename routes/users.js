@@ -205,28 +205,85 @@ router.post('/edit', VerifyToken, async function(req, res) {
 
 // Change password
 router.post('/editpassword', VerifyToken, async function(req, res) {
-    //console.log("editer user", req.body)
+    console.log("ROUTE CHAGEMENT DE PASSWORD")
     const { errors, isValid } = validateChangePassword(req.body);
 
     if(!isValid) {
         return res.status(400).json(errors);
     }
 
-    const body = {
-        username: req.body.username,
-        email: req.body.email
-    }
 
     let error;
 
-    User.findById(req.body._id).exec(function (err, user) {
+    User.findById(req.body.id).exec(function (err, user) {
         if (user) {
+            console.log(user.password)
+            let pass;
+            bcrypt.genSalt(10, (err, salt) => {
+                if(err) throw err;
+                else {
+                    bcrypt.hash(req.body.password, salt, (err, hash) => {
+                        if(err) throw err;
+                        else {
+                            //console.log("password", hash)
+                            pass = hash;
+                        }
+                    });
+                }
+            });
             user.comparePassword(req.body.password, function(err, isMatch) {
+                if (err) console.log(err)
+                if (!isMatch) {
+                    error = {...error, password: 'Mot de passe invalide'}
+                    res.status(400).json(error)
+                } else {
+                    console.log("je change le mot de passe")
+                    bcrypt.genSalt(10, (err, salt) => {
+                        if(err) throw err;
+                        else {
+                            bcrypt.hash(req.body.newPassword, salt, (err, hash) => {
+                                if(err) throw err;
+                                else {
+                                    console.log("nouveau password", hash)
+                                    console.log("password rentré", pass)
+                                    console.log("ancien password", user.password)
+                                   /* user.password = hash;
+                                    user
+                                        .save()
+                                        .then(user => {
+                                            res.json(user)
+                                        });*/
+                                }
+                            });
+                        }
+                    });
+                }
+            });
+            /*user.comparePassword(req.body.password, function(err, isMatch) {
                 if (err) throw err;
                 if (!isMatch) {
                     error = {...error, password: 'Mot de passe invalide'}
+                    res.status(400).json(error)
+                } else {
+                    console.log("je change le mot de passe")
+                    bcrypt.genSalt(10, (err, salt) => {
+                        if(err) throw err;
+                        else {
+                            bcrypt.hash(req.body.newPassword, salt, (err, hash) => {
+                                if(err) throw err;
+                                else {
+                                    user.password = hash;
+                                    user
+                                        .save()
+                                        .then(user => {
+                                            res.json(user)
+                                        });
+                                }
+                            });
+                        }
+                    });
                 }
-            });
+            });*/
         }
     })
 });
@@ -669,6 +726,7 @@ router.get('/:id', (req, res) => {
                                     'in': {
                                         'title': '$$s.title',
                                         '_id': '$$s._id',
+                                        'cover': '$$s.cover',
                                         'author': {
                                             '$let': {
                                                 'vars': {

@@ -277,6 +277,15 @@ StorySchema.statics.paginate = function(pageNo, callback){
 
 };
 
+
+StorySchema.path('chapters').validate(function (val) {
+    if (this.val && this.val.length > 1) {
+        console.log("machin")
+        return false
+    } else {
+        console.log("coucou")
+    }
+}, 'validation of `{PATH}` failed with value `{VALUE}`');
 const StoryModel = mongoose.model('Story', StorySchema);
 
 

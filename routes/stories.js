@@ -215,43 +215,10 @@ router.get('/all/:page/:perpage', function(req, res) {
 router.get('/user/:id', async function (req, res) {
     var id = req.params.id;
 
-    let stories = await Story.find({ author: new ObjectId(id) }).exec();
-
-    res.json(stories);
-});
-
-// Get story from id
-router.get('/:id', async function (req, res) {
-    var id = req.params.id;
-
-
-    /*Story.findOne({ _id: new ObjectId(id) }).populate('author').lean().exec(function(err, stories){
-        if (err)
-            return err
-        else {
-            const newStory = {
-            ...stories,
-            author: {
-                _id: stories.author._id,
-                username: stories.author.username,
-                username_display: stories.author.username_display
-                },
-            }
-            res.json(newStory);
-        }
-    });*/
-
-    /*Story.aggregate([
+    const query = [
         {
             '$match': {
-                '_id': new ObjectId(id)
-            }
-        }, {
-            '$lookup': {
-                'from': 'users',
-                'localField': '_id',
-                'foreignField': 'reading_lists.stories',
-                'as': 'faved'
+                'author': new ObjectId(id)
             }
         }, {
             '$lookup': {
@@ -261,8 +228,58 @@ router.get('/:id', async function (req, res) {
                 'as': 'author'
             }
         }, {
+            '$lookup': {
+                'from': 'users',
+                'localField': '_id',
+                'foreignField': 'reading_lists.stories',
+                'as': 'faved'
+            }
+        }, {
             '$unwind': {
                 'path': '$author'
+            }
+        }, {
+            '$group': {
+                '_id': '$_id',
+                'total_fav': {
+                    '$push': {
+                        '$reduce': {
+                            'input': {
+                                '$reduce': {
+                                    'input': '$faved.reading_lists.stories',
+                                    'initialValue': [],
+                                    'in': {
+                                        '$concatArrays': [
+                                            '$$value', '$$this'
+                                        ]
+                                    }
+                                }
+                            },
+                            'initialValue': [],
+                            'in': {
+                                '$concatArrays': [
+                                    '$$value', '$$this'
+                                ]
+                            }
+                        }
+                    }
+                },
+                'doc': {
+                    '$first': '$$ROOT'
+                }
+            }
+        }, {
+            '$unwind': {
+                'path': '$total_fav',
+                'preserveNullAndEmptyArrays': true
+            }
+        }, {
+            '$addFields': {
+                'doc.all_faved': '$total_fav'
+            }
+        }, {
+            '$replaceRoot': {
+                'newRoot': '$doc'
             }
         }, {
             '$project': {
@@ -274,9 +291,9 @@ router.get('/:id', async function (req, res) {
                 'updated_at': 1,
                 'category': 1,
                 'rating': 1,
-                'status': 1,
                 'chapters': 1,
                 'likes': 1,
+                'status': 1,
                 'nb_comments': {
                     '$sum': {
                         '$map': {
@@ -288,22 +305,212 @@ router.get('/:id', async function (req, res) {
                         }
                     }
                 },
-                'nb_favorites': {
-                    '$size': '$faved'
-                },
                 'nb_likes': {
                     '$size': '$likes'
+                },
+                'nb_favorites': {
+                    '$size': {
+                        '$filter': {
+                            'input': '$all_faved',
+                            'as': 't',
+                            'cond': {
+                                '$eq': [
+                                    '$$t', '$_id'
+                                ]
+                            }
+                        }
+                    }
+                }
+            }
+        }, {
+            '$sort': {
+                'created_at': 1
+            }
+        }
+    ];
+    Story.aggregate(query).exec(function (err, story) {
+        if (err) return err
+        res.json(story)
+    })
+});
+
+// Get story from id
+router.get('/:id', async function (req, res) {
+    var id = req.params.id;
+    /*[
+        {
+            '$match': {
+                '_id': new ObjectId(id)
+            }
+        }, {
+        '$lookup': {
+            'from': 'users',
+            'localField': '_id',
+            'foreignField': 'reading_lists.stories',
+            'as': 'faved'
+        }
+    }, {
+        '$lookup': {
+            'from': 'users',
+            'localField': 'author',
+            'foreignField': '_id',
+            'as': 'author'
+        }
+    }, {
+        '$unwind': {
+            'path': '$author'
+        }
+    }, {
+        '$unwind': {
+            'path': '$chapters'
+        }
+    }, {
+        '$addFields': {
+            'chapters.comments.title': '$chapters.title',
+            'chapters.comments.chapter_id': '$chapters._id'
+        }
+    }, {
+        '$group': {
+            '_id': '$_id',
+            'doc': {
+                '$first': '$$ROOT'
+            },
+            'chap': {
+                '$push': '$chapters'
+            }
+        }
+    }, {
+        '$addFields': {
+            'doc.chapters': '$chap'
+        }
+    }, {
+        '$replaceRoot': {
+            'newRoot': '$doc'
+        }
+    }, {
+        '$addFields': {
+            'all_comments': {
+                '$reduce': {
+                    'input': '$chapters.comments',
+                    'initialValue': [],
+                    'in': {
+                        '$concatArrays': [
+                            '$$value', '$$this'
+                        ]
+                    }
                 }
             }
         }
-    ]).exec(function(err, story){
-        if (err)
-            return err
-        else {
-            res.json(story[0]);
+    }, {
+        '$unwind': {
+            'path': '$all_comments',
+            'preserveNullAndEmptyArrays': true
         }
-    });*/
-    Story.aggregate([
+    }, {
+        '$sort': {
+            'all_comments.created_at': -1
+        }
+    }, {
+        '$lookup': {
+            'from': 'users',
+            'localField': 'all_comments.author',
+            'foreignField': '_id',
+            'as': 'all_comments.author'
+        }
+    }, {
+        '$unwind': {
+            'path': '$all_comments.author',
+            'preserveNullAndEmptyArrays': true
+        }
+    }, {
+        '$project': {
+            'all_comments.author.password': 0,
+            'all_comments.author.followers': 0,
+            'all_comments.author.following': 0,
+            'all_comments.author.reading_lists': 0,
+            'all_comments.author.email': 0,
+            'all_comments.author.created_at': 0,
+            'all_comments.author.badges': 0,
+            'all_comments.author.notes': 0,
+            'all_comments.author.todo_lists': 0,
+            'all_comments.author.birth_date': 0,
+            'chapters.comments.title': 0,
+            'chapters.comments.chapter_id': 0
+        }
+    }, {
+        '$group': {
+            '_id': '$_id',
+            'doc': {
+                '$first': '$$ROOT'
+            },
+            'all_comments': {
+                '$push': '$all_comments'
+            }
+        }
+    }, {
+        '$addFields': {
+            'doc.all_comments': '$all_comments'
+        }
+    }, {
+        '$replaceRoot': {
+            'newRoot': '$doc'
+        }
+    }, {
+        '$project': {
+            'title': 1,
+            'author.username': 1,
+            'author.username_display': 1,
+            'author._id': 1,
+            'description': 1,
+            'updated_at': 1,
+            'category': 1,
+            'rating': 1,
+            'chapters': 1,
+            'likes': 1,
+            'status': 1,
+            'cover': 1,
+            'annotation_authorized': 1,
+            'comment_authorized': 1,
+            'nb_comments': {
+                '$sum': {
+                    '$map': {
+                        'input': '$chapters',
+                        'as': 'c',
+                        'in': {
+                            '$size': '$$c.comments'
+                        }
+                    }
+                }
+            },
+            'nb_favorites': {
+                '$size': '$faved'
+            },
+            'nb_likes': {
+                '$size': '$likes'
+            },
+            'last_comments': {
+                '$cond': {
+                    'if': {
+                        '$eq': [
+                            {
+                                '$arrayElemAt': [
+                                    '$all_comments', 0
+                                ]
+                            }, {}
+                        ]
+                    },
+                    'then': [],
+                    'else': {
+                        '$slice': [
+                            '$all_comments', 10
+                        ]
+                    }
+                }
+            }
+        }
+    }
+    ]*/
+    const query = [
         {
             '$match': {
                 '_id': new ObjectId(id)
@@ -328,12 +535,29 @@ router.get('/:id', async function (req, res) {
             }
         }, {
             '$unwind': {
-                'path': '$chapters'
+                'path': '$chapters',
+                'preserveNullAndEmptyArrays': true
             }
         }, {
             '$addFields': {
-                'chapters.comments.title': '$chapters.title',
-                'chapters.comments.chapter_id': '$chapters._id'
+                'chapters.comments.title': {
+                    '$cond': [
+                        {
+                            '$gte': [
+                                '$chapters', null
+                            ]
+                        }, '$chapters.title', '$$REMOVE'
+                    ]
+                },
+                'chapters.comments.chapter_id': {
+                    '$cond': [
+                        {
+                            '$gte': [
+                                '$chapters', null
+                            ]
+                        }, '$chapters._id', '$$REMOVE'
+                    ]
+                }
             }
         }, {
             '$group': {
@@ -342,7 +566,15 @@ router.get('/:id', async function (req, res) {
                     '$first': '$$ROOT'
                 },
                 'chap': {
-                    '$push': '$chapters'
+                    '$push': {
+                        '$cond': [
+                            {
+                                '$gte': [
+                                    '$chapters._id', null
+                                ]
+                            }, '$chapters', '$$REMOVE'
+                        ]
+                    }
                 }
             }
         }, {
@@ -475,7 +707,9 @@ router.get('/:id', async function (req, res) {
                 }
             }
         }
-    ]).exec(function(err, story){
+    ];
+
+    Story.aggregate(query).exec(function(err, story){
         if (err)
             return err
         else {
@@ -685,7 +919,6 @@ router.get('/last/posted', async function (req, res) {
 
 // Post a story
 router.post('/', VerifyToken, function(req, res, next) {
-    console.log(req.body);
     const id = req.userId;
 
     const story = new Story({
@@ -713,9 +946,12 @@ router.post('/edit/:id', upload.single('cover'), VerifyToken, function(req, res,
     } else {
         body = {...JSON.parse(req.body.postData), updated_at: new Date()};
     }
+    if (body.status.id !== 3 && !body.chapters) {
+        res.status(400).json({message : "Vous ne pouvez pas publier une histoire sans chapitres"})
+    }
     Story.findOneAndUpdate(query,{$set: body}, { new: true} , function (err, story) {
         if (err) return err
-        return res.json(story);
+        res.json(story);
     })
 });
 
@@ -756,6 +992,17 @@ router.get('/:id/chapter/:idChapter', async function (req, res) {
         {
             '$match': {
                 'chapters._id': new ObjectId(idChapter)
+            }
+        }, {
+            '$lookup': {
+                'from': 'users',
+                'localField': 'author',
+                'foreignField': '_id',
+                'as': 'author'
+            }
+        },  {
+            '$unwind': {
+                'path': '$author',
             }
         }, {
             '$addFields': {
@@ -845,11 +1092,26 @@ router.get('/:id/chapter/:idChapter', async function (req, res) {
                                     'in': {
                                         'username': '$$a.username',
                                         '_id': '$$a._id',
-                                        'username_display': '$$a.username_display'
+                                        'username_display': '$$a.username_display',
+                                        'image': '$$a.image'
                                     }
                                 }
                             }
                         }
+                    }
+                },
+                'story.author': {
+                    '$let': {
+                        'vars': {
+                            'a': '$story.author'
+                        },
+                        'in': {
+                            'username': '$$a.username',
+                            '_id': '$$a._id',
+                            'username_display': '$$a.username_display',
+                            'image': '$$a.image'
+                        }
+
                     }
                 },
                 'story.selectedChapter': '$$REMOVE'
@@ -866,6 +1128,41 @@ router.get('/:id/chapter/:idChapter', async function (req, res) {
             res.json({story: selectedstory, selectedChapter: selectedchapter});
         }
     });
+});
+
+// Delete chapter from id
+router.post('/chapter/delete/:id', VerifyToken, async function (req, res) {
+    let id = req.params.id;
+
+    const query = {"chapters":{"$elemMatch":{_id: new ObjectId(id)}} };
+    const updates = {$pull:{"chapters":{"_id":new ObjectId(id)}}};
+
+    Story.findOne(query, function(err, story) {
+        if (err) throw err
+        if (story.chapters.length === 1 && story.status.id !== 3) {
+            let error = {message: "Une histoire publiée doit avoir au moins un chapitre"}
+            res.status(400).json(error)
+        } else {
+            story.update(updates, { new: true }, function(err, story) {
+                if (err) {
+                    throw err
+                } else {
+                    res.json(id)
+                }
+            })
+        }
+    });
+    /*Story.findOneAndUpdate(query, updates, { new: true }, function(err, story) {
+        if (err) throw err
+        if (story.chapters.length === 0 && story.status !== 3) {
+            console.log("plus de chapitres")
+            story.status = {id: 3, label: "Brouillon"}
+            story.save()
+                .then(s => {
+                    console.log(s)
+                });
+        }
+    });*/
 });
 
 // Edit chapter from id
@@ -1019,8 +1316,10 @@ router.post('/:id/new/chapter', VerifyToken, function(req, res, next) {
     Story.findByIdAndUpdate(
         id,
         { $push: { chapters: req.body } },
+        {new: true},
         function (err, story) {
-            return res.json(story);
+            let chapter = story.chapters.pop()
+            return res.json(chapter);
     })
 });
 

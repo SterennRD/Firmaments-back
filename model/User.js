@@ -113,15 +113,24 @@ UserSchema.pre('save', function(next) {
 });
 
 UserSchema.methods.isValidPassword = function(password, done) {
-    bcrypt.compare(password, this.password, (err, isEqual) => done(isEqual));
-};
-UserSchema.methods.comparePassword = function(candidatePassword, cb) {
-    bcrypt.compare(candidatePassword, this.password, function(err, isMatch) {
-        console.log("je compare", candidatePassword, this.password)
-        if (err) return cb(err);
-        cb(null, isMatch);
+    bcrypt.hash(password, 10, function(err, hash){
+        if(err) throw err;
+
+        bcrypt.compare(password, hash, function(err, isEqual) {
+            if (err) { throw (err); }
+            done(isEqual)
+        });
+
     });
+
 };
+// UserSchema.methods.comparePassword = function(candidatePassword, cb) {
+//     bcrypt.compare(candidatePassword, this.password, function(err, isMatch) {
+//         console.log("je compare", candidatePassword, this.password)
+//         if (err) return cb(err);
+//         cb(null, isMatch);
+//     });
+// };
 UserSchema.plugin(uniqueValidator);
 const UserModel = mongoose.model('User',UserSchema);
 
