@@ -710,6 +710,7 @@ router.get('/:id', (req, res) => {
                 'stories.updated_at': 1,
                 'stories.category': 1,
                 'stories.rating': 1,
+                'stories.cover': 1,
                 'stories.status': 1,
                 'reading_lists': {
                     '$map': {

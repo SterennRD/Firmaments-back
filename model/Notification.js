@@ -22,8 +22,11 @@ const NotificationSchema = new Schema({
         title: String
     },
     chapter_id: {
-        type: Schema.Types.ObjectId,
-        ref: 'Chapter'
+        _id:{
+            type: Schema.Types.ObjectId,
+            ref: 'Chapter'
+        },
+        title: String
     },
     message: String,
     seen: {

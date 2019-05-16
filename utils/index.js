@@ -26,6 +26,7 @@ function getCleanUser(user) {
         _id: u._id,
         name: u.name,
         username: u.username,
+        username_display: u.username_display,
         email: u.email,
         role: u.role,
         created_at: u.created_at,

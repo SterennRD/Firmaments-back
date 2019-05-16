@@ -32,4 +32,19 @@ router.get('/unread/:id', VerifyToken, function(req, res) {
     });
 });
 
+// Mark notif as read
+router.post('/:id/read', VerifyToken, function(req, res) {
+    const idNotif = req.params.id;
+    const idUser = req.userId;
+    const query = {'_id': new ObjectId(idNotif), 'user_to': {$in: [new ObjectId(idUser)]}, 'seen': false}
+    const update = {'$set': {"seen": true}}
+    Notification.findOneAndUpdate(query, update, {new: true}).exec(function(err, notifs){
+        if (err)
+            next(err)
+        else {
+            res.json(notifs);
+        }
+    });
+});
+
 module.exports = router;

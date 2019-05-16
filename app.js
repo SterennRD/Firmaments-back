@@ -70,6 +70,31 @@ io.on('connection', function(socket){
         notif.save();
         io.to(`${userSocketId}`).emit('receiveComment', notif)
     });
+    socket.on('readChapter', async function (data) {
+        let user = await User.findOne({'_id' : data.user_from}).lean();
+        let chapter = await Story.findOne({'chapters._id' : data.chapter_id}).exec();
+        let userSocketId = socketUsers.find(u => u.user._id == user._id).socketId;
+        data = {
+            ...data,
+            user_to: {
+                '_id': user._id,
+                'username': user.username,
+                'username_display': user.username_display
+            },
+            user_from: {
+                '_id': user._id,
+                'username': user.username,
+                'username_display': user.username_display
+            },
+            chapter_id: {
+                '_id': chapter._id,
+                'title': chapter.title
+            },
+        };
+        const notif = new Notification(data);
+        notif.save();
+        io.to(`${userSocketId}`).emit('readChapterAdded', notif)
+    });
     socket.on('message', async function (data, to) {
         console.log(data);
         console.log(to);

@@ -933,7 +933,7 @@ router.post('/', VerifyToken, function(req, res, next) {
 });
 
 // Edit a story
-router.post('/edit/:id', upload.single('cover'), VerifyToken, function(req, res, next) {
+router.post('/edit/:id', upload.single('cover'), VerifyToken, async function(req, res, next) {
     console.log("les modifs arrivent")
     console.log(req.body);
     console.log(JSON.parse(req.body.postData));
@@ -946,13 +946,19 @@ router.post('/edit/:id', upload.single('cover'), VerifyToken, function(req, res,
     } else {
         body = {...JSON.parse(req.body.postData), updated_at: new Date()};
     }
-    if (body.status.id !== 3 && !body.chapters) {
+    console.log("boidy status", body)
+    let currStory = await Story.findOne(query).exec()
+    if (body.status && body.status.id !== 3 && !currStory.chapters) {
         res.status(400).json({message : "Vous ne pouvez pas publier une histoire sans chapitres"})
+    } else {
+        Story.findOneAndUpdate(query,{$set: body}, { new: true} , function (err, story) {
+            if (err) throw err
+            else {
+                res.json(story);
+            }
+        })
     }
-    Story.findOneAndUpdate(query,{$set: body}, { new: true} , function (err, story) {
-        if (err) return err
-        res.json(story);
-    })
+
 });
 
 // Add like
@@ -1165,12 +1171,45 @@ router.post('/chapter/delete/:id', VerifyToken, async function (req, res) {
     });*/
 });
 
+// Add chapter to read
+router.post('/chapter/read/:idChapter/:id', VerifyToken, async function (req, res) {
+    let idChapter = req.params.idChapter;
+    let id = req.params.id;
+
+    const query = {"chapters._id": new ObjectId(idChapter) }
+    const updates = {$addToSet: {"chapters.$.read":new ObjectId(id)}}
+
+    let oldStory = await Story.findOne(query).exec();
+    Story.findOneAndUpdate(query, updates, {new: true}, function(err, story) {
+        if (err) throw err
+        if (!story) {
+            console.log("déjà lu !")
+            res.status(400).json({message : "déjà lu"})
+        } else {
+            if (oldStory.chapters.read !== story.chapters.read) {
+                res.status(400).json({message : "déjà lu"})
+            } else {
+                console.log("pareil")
+                res.json(story)
+            }
+        }
+
+    });
+});
+
 // Edit chapter from id
 router.post('/:id/chapter/:idChapter/edit', async function (req, res) {
     let id = req.params.id;
     let idChapter = req.params.idChapter;
 
     const newChap = {...req.body, updated_at: new Date()}
+
+    const s = await Story.findOne({ "_id": new ObjectId(id) })
+    const chapterStatus = s.chapters.filter(c => c.status.label === "Brouillon")
+    let query;
+    if (chapterStatus.length === 1 && req.body.status !== 3)
+
+    console.log(chapterStatus.length)
 
     Story.findOneAndUpdate(
         { "_id": new ObjectId(id), "chapters._id": new ObjectId(idChapter) },
@@ -1449,7 +1488,7 @@ router.get('/search/story/all/:page/:perpage', function(req, res) {
                         '$ne': 'Brouillon'
                     },
                     'title': {
-                        "$regex": req.query.search
+                        "$regex": new RegExp(req.query.search, "i"),
                     }
                 }
             }, {
